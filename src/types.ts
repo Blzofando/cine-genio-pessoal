@@ -55,6 +55,20 @@ export interface Recommendation {
   posterUrl?: string;
 }
 
+// Adicionado aqui para ser acessível globalmente
+export interface TMDbSearchResult {
+    id: number;
+    title?: string;
+    name?: string;
+    overview: string;
+    popularity: number;
+    media_type: 'movie' | 'tv';
+    poster_path: string | null;
+    genre_ids: number[];
+    release_date?: string;
+    first_air_date?: string;
+}
+
 // Enum para controlar a visão atual do aplicativo
 export enum View {
   MENU,

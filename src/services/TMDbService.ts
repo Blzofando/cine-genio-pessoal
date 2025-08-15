@@ -1,4 +1,4 @@
-import { WatchProviders } from "../types";
+import { WatchProviders, TMDbSearchResult } from "../types"; // Agora importa o TMDbSearchResult
 
 const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const BASE_URL = 'https://api.themoviedb.org/3';
@@ -32,19 +32,6 @@ const addToQueue = <T>(requestFn: () => Promise<T>): Promise<T> => {
         if (!isProcessing) processQueue();
     });
 };
-
-export interface TMDbSearchResult {
-    id: number;
-    title?: string;
-    name?: string;
-    overview: string;
-    popularity: number;
-    media_type: 'movie' | 'tv';
-    poster_path: string | null;
-    genre_ids: number[];
-    release_date?: string;
-    first_air_date?: string;
-}
 
 // Função interna para buscar no TMDb
 const internalSearchTMDb = async (query: string, lang: 'pt-BR' | 'en-US' = 'pt-BR'): Promise<TMDbSearchResult[]> => {
