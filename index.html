@@ -26,6 +26,32 @@
     }
     </script>
     <link rel="stylesheet" href="/index.css">
+    <style>
+      @keyframes duel-left {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(120px); }
+      }
+
+      @keyframes duel-right {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-120px); }
+      }
+
+      @keyframes poeira {
+        0%, 100% { opacity: 0; transform: scale(0.5); }
+        50% { opacity: 1; transform: scale(1.5); }
+      }
+
+      @keyframes trophy-up {
+        0% { transform: translateY(50px) scale(0.8); opacity: 0; }
+        100% { transform: translateY(0) scale(1); opacity: 1; }
+      }
+
+      .animate-duel-left { animation: duel-left 0.8s ease-in-out forwards; }
+      .animate-duel-right { animation: duel-right 0.8s ease-in-out forwards; }
+      .animate-poeira { animation: poeira 1.5s ease-in-out; }
+      .animate-trophy-up { animation: trophy-up 0.5s ease-out forwards; }
+    </style>
   </head>
   <body class="bg-gray-900 text-white">
     <div id="root"></div>

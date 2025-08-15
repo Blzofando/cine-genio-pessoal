@@ -71,7 +71,7 @@ const duelSchema = {
         verdict: { 
             type: Type.STRING, 
             // ### AQUI ESTÁ A MUDANÇA ###
-            description: "O veredito final do Gênio. Seja criativo, divertido e um pouco dramático. Declare um vencedor claro e explique o porquê de forma descontraída, como se estivesse narrando o final de uma batalha épica. Pode fazer piadas se um dos títulos for obviamente inferior ou um hype passageiro." 
+            description: "O veredito final do Gênio. Seja criativo, divertido e um pouco dramático. Declare um vencedor claro. IMPORTANTE: Mantenha o veredito com no máximo 3 frases curtas." 
         }
     },
     required: ["title1", "title2", "verdict"]

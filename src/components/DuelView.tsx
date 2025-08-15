@@ -1,4 +1,4 @@
-import React, { useState, useContext, useMemo, useCallback } from 'react';
+import React, { useState, useContext, useMemo, useCallback, useEffect } from 'react';
 import { WatchedDataContext } from '../App';
 import { DuelResult, TMDbSearchResult } from '../types';
 import { getDuelAnalysis } from '../services/RecommendationService';
@@ -7,7 +7,7 @@ import { searchTMDb } from '../services/TMDbService';
 // --- Componente de Seleção de Título com Autocomplete ---
 interface TitleSelectorProps {
     label: string;
-    onTitleSelect: (title: TMDbSearchResult) => void;
+    onTitleSelect: (title: TMDbSearchResult | null) => void;
 }
 const TitleSelector: React.FC<TitleSelectorProps> = ({ label, onTitleSelect }) => {
     const [query, setQuery] = useState('');
@@ -47,14 +47,16 @@ const TitleSelector: React.FC<TitleSelectorProps> = ({ label, onTitleSelect }) =
 
     if (selectedTitle) {
         return (
-            <div className="bg-gray-700/50 p-3 rounded-lg text-center">
-                <img 
-                    src={selectedTitle.poster_path ? `https://image.tmdb.org/t/p/w185${selectedTitle.poster_path}` : 'https://placehold.co/185x278/374151/9ca3af?text=?'} 
-                    alt="poster" 
-                    className="w-24 h-36 object-cover rounded-md mx-auto mb-2"
-                />
-                <p className="font-bold text-white text-sm">{selectedTitle.title || selectedTitle.name}</p>
-                <button onClick={() => { setSelectedTitle(null); onTitleSelect(null as any); }} className="text-xs text-indigo-400 hover:underline mt-1">
+            <div className="bg-gray-700/50 p-3 rounded-lg text-center h-full flex flex-col justify-between">
+                <div>
+                    <img 
+                        src={selectedTitle.poster_path ? `https://image.tmdb.org/t/p/w185${selectedTitle.poster_path}` : 'https://placehold.co/185x278/374151/9ca3af?text=?'} 
+                        alt="poster" 
+                        className="w-24 h-36 object-cover rounded-md mx-auto mb-2"
+                    />
+                    <p className="font-bold text-white text-sm">{selectedTitle.title || selectedTitle.name}</p>
+                </div>
+                <button onClick={() => { setSelectedTitle(null); onTitleSelect(null); }} className="text-xs text-indigo-400 hover:underline mt-1">
                     Alterar
                 </button>
             </div>
@@ -89,9 +91,9 @@ interface BattleAnimationProps {
 const BattleAnimation: React.FC<BattleAnimationProps> = ({ poster1, poster2 }) => (
     <div className="mt-10 w-full max-w-xl flex flex-col items-center justify-center animate-fade-in">
         <div className="relative w-full h-48 flex justify-center items-center">
-            <img src={poster1 || 'https://placehold.co/150x225/374151/9ca3af?text=?'} alt="Pôster 1" className="w-28 h-42 object-cover rounded-md shadow-lg absolute animate-duel-left"/>
+            <img src={poster1 || 'https://placehold.co/150x225/374151/9ca3af?text=?'} alt="Pôster 1" className="w-28 h-42 object-cover rounded-md shadow-lg absolute left-0 animate-duel-left"/>
             <div className="text-5xl font-black text-gray-500 animate-pulse-fast">VS</div>
-            <img src={poster2 || 'https://placehold.co/150x225/374151/9ca3af?text=?'} alt="Pôster 2" className="w-28 h-42 object-cover rounded-md shadow-lg absolute animate-duel-right"/>
+            <img src={poster2 || 'https://placehold.co/150x225/374151/9ca3af?text=?'} alt="Pôster 2" className="w-28 h-42 object-cover rounded-md shadow-lg absolute right-0 animate-duel-right"/>
             <div className="absolute text-7xl opacity-0 animate-poeira">💥</div>
         </div>
         <h2 className="text-xl font-bold text-gray-400 mt-4 animate-pulse">Duelo em análise...</h2>
@@ -160,12 +162,24 @@ const DuelView: React.FC = () => {
         setIsLoading(false);
     };
 
+    // Renderização principal
+    let content;
     if (isLoading) {
-        return <BattleAnimation poster1={title1?.poster_path ? `https://image.tmdb.org/t/p/w185${title1.poster_path}` : undefined} poster2={title2?.poster_path ? `https://image.tmdb.org/t/p/w185${title2.poster_path}` : undefined} />;
-    }
-
-    if (result) {
-        return <WinnerDisplay result={result} onReset={handleReset} />;
+        content = <BattleAnimation poster1={title1?.poster_path ? `https://image.tmdb.org/t/p/w185${title1.poster_path}` : undefined} poster2={title2?.poster_path ? `https://image.tmdb.org/t/p/w185${title2.poster_path}` : undefined} />;
+    } else if (result) {
+        content = <WinnerDisplay result={result} onReset={handleReset} />;
+    } else {
+        content = (
+            <>
+                <div className="w-full max-w-2xl mb-8 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                    <TitleSelector label="Desafiante 1" onTitleSelect={setTitle1} />
+                    <TitleSelector label="Desafiante 2" onTitleSelect={setTitle2} />
+                </div>
+                <button onClick={handleDuel} disabled={!title1 || !title2} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-12 rounded-lg text-xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                    Iniciar Duelo
+                </button>
+            </>
+        );
     }
 
     return (
@@ -174,17 +188,8 @@ const DuelView: React.FC = () => {
             <p className="text-lg text-gray-400 mb-8 max-w-2xl">
                 Em dúvida entre dois? Deixe o Gênio decidir qual tem mais a ver com você.
             </p>
-
-            <div className="w-full max-w-2xl mb-8 grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
-                <TitleSelector label="Título 1" onTitleSelect={setTitle1} />
-                <TitleSelector label="Título 2" onTitleSelect={setTitle2} />
-            </div>
-
-            <button onClick={handleDuel} disabled={!title1 || !title2} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-12 rounded-lg text-xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
-                Iniciar Duelo
-            </button>
-
-            {error && <p className="mt-8 text-red-400 bg-red-900/50 p-4 rounded-lg w-full max-w-2xl">{error}</p>}
+            {content}
+            {error && !isLoading && <p className="mt-8 text-red-400 bg-red-900/50 p-4 rounded-lg w-full max-w-2xl">{error}</p>}
         </div>
     );
 };
