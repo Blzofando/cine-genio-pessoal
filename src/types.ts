@@ -84,15 +84,14 @@ export interface RadarRelease {
     reason: string;
 }
 
-// NOVO: Estrutura para o Desafio do Gênio
 export interface Challenge {
     title: string;
     tmdbId: number;
     tmdbMediaType: 'movie' | 'tv';
     posterUrl?: string;
-    challengeType: string; // Ex: "Desafio do Diretor", "Gênero Oculto"
-    reason: string; // O porquê de a IA ter escolhido este desafio
-    weekId: string; // Identificador da semana (ex: "2024-33")
+    challengeType: string;
+    reason: string;
+    weekId: string;
 }
 
 export interface TMDbSearchResult {
@@ -124,5 +123,6 @@ export enum View {
   WATCHLIST,
   DUEL,
   RADAR,
-  CHALLENGE // Adicionamos a nova tela de Desafio
+  CHALLENGE,
+  CHAT // Adicionamos a nova tela de Chat
 }

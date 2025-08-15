@@ -5,16 +5,18 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { db } from './services/firebaseConfig';
 import { getFullMediaDetailsFromQuery } from './services/RecommendationService';
 import { addWatchedItem, removeWatchedItem, updateWatchedItem } from './services/firestoreService';
+
 import WatchlistView from './components/WatchlistView';
 import MainMenu from './components/MainMenu';
-import ChallengeView from './components/ChallengeView';
-import RadarView from './components/RadarView';
-import DuelView from './components/DuelView';
 import SuggestionView from './components/SuggestionView';
 import StatsView from './components/StatsView';
 import CollectionView from './components/CollectionView';
 import RandomView from './components/RandomView';
 import PredictView from './components/PredictView';
+import DuelView from './components/DuelView';
+import RadarView from './components/RadarView';
+import ChallengeView from './components/ChallengeView';
+import ChatView from './components/ChatView';
 
 const initialData: AllManagedWatchedData = {
     amei: [], gostei: [], meh: [], naoGostei: []
@@ -65,8 +67,6 @@ const WatchedDataProvider = ({ children }: { children: React.ReactNode }) => {
                 items.push(doc.data() as ManagedWatchedItem);
             });
 
-            // CORREÇÃO DO BUG: O valor inicial do reduce agora é um objeto novo,
-            // garantindo que os dados não sejam acumulados incorretamente a cada atualização.
             const groupedData = items.reduce((acc, item) => {
                 const rating = item.rating || 'meh';
                 acc[rating].push(item);
@@ -141,14 +141,6 @@ const App: React.FC = () => {
     switch (currentView) {
       case View.MENU:
         return <MainMenu setView={setCurrentView} />;
-      case View.CHALLENGE:
-        return <ViewContainer onBack={handleBackToMenu}><ChallengeView /></ViewContainer>;
-      case View.RADAR:
-        return <ViewContainer onBack={handleBackToMenu}><RadarView /></ViewContainer>;
-      case View.WATCHLIST:
-        return <ViewContainer onBack={handleBackToMenu}><WatchlistView /></ViewContainer>;
-      case View.DUEL:
-        return <ViewContainer onBack={handleBackToMenu}><DuelView /></ViewContainer>;
       case View.SUGGESTION:
         return <ViewContainer onBack={handleBackToMenu}><SuggestionView /></ViewContainer>;
       case View.STATS:
@@ -159,6 +151,16 @@ const App: React.FC = () => {
         return <ViewContainer onBack={handleBackToMenu}><RandomView /></ViewContainer>;
       case View.PREDICT:
         return <ViewContainer onBack={handleBackToMenu}><PredictView /></ViewContainer>;
+      case View.WATCHLIST:
+        return <ViewContainer onBack={handleBackToMenu}><WatchlistView /></ViewContainer>;
+      case View.DUEL:
+        return <ViewContainer onBack={handleBackToMenu}><DuelView /></ViewContainer>;
+      case View.RADAR:
+        return <ViewContainer onBack={handleBackToMenu}><RadarView /></ViewContainer>;
+      case View.CHALLENGE:
+        return <ViewContainer onBack={handleBackToMenu}><ChallengeView /></ViewContainer>;
+      case View.CHAT:
+        return <ViewContainer onBack={handleBackToMenu}><ChatView setView={setCurrentView} /></ViewContainer>;
       default:
         return <MainMenu setView={setCurrentView} />;
     }
@@ -166,12 +168,12 @@ const App: React.FC = () => {
 
   return (
     <WatchlistProvider>
-      <WatchedDataProvider>
-          <div className="App">
-              {renderView()}
-          </div>
-      </WatchedDataProvider>
-  </WatchlistProvider>
+        <WatchedDataProvider>
+            <div className="App">
+                {renderView()}
+            </div>
+        </WatchedDataProvider>
+    </WatchlistProvider>
   );
 };
 
