@@ -34,6 +34,22 @@ ${formattedData}`;
     return { ...recommendationData, posterUrl };
 };
 
+// ### FUNÇÃO RESTAURADA ###
+export const getPredictionAsRecommendation = async (title: string, watchedData: AllManagedWatchedData): Promise<Recommendation> => {
+    const formattedData = formatWatchedDataForPrompt(watchedData);
+    const prompt = `Você é o "CineGênio Pessoal". Sua tarefa é analisar o título "${title}" e prever se o usuário vai gostar, com base no perfil de gosto dele. Use a busca na internet para encontrar informações sobre "${title}" (gênero, enredo, temas).
+
+**PERFIL DO USUÁRIO:**
+${formattedData}
+
+**Sua Tarefa:**
+Analise "${title}" e gere uma resposta completa no formato JSON, seguindo o schema, com probabilidades de gosto e uma análise detalhada.`;
+    
+    const recommendationData = await fetchRecommendation(prompt);
+    const posterUrl = await fetchPosterUrl(recommendationData.title) ?? undefined;
+    return { ...recommendationData, posterUrl };
+};
+
 
 export const getDuelAnalysis = async (title1: string, title2: string, watchedData: AllManagedWatchedData): Promise<DuelResult> => {
     const formattedData = formatWatchedDataForPrompt(watchedData);
