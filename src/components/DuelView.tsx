@@ -4,7 +4,7 @@ import { DuelResult, TMDbSearchResult } from '../types';
 import { getDuelAnalysis } from '../services/RecommendationService';
 import { searchTMDb } from '../services/TMDbService';
 
-// --- Componente de Seleção de Título com Autocomplete ---
+// --- Componente de Seleção de Título com Autocomplete (Inalterado) ---
 interface TitleSelectorProps {
     label: string;
     onTitleSelect: (title: TMDbSearchResult | null) => void;
@@ -26,7 +26,7 @@ const TitleSelector: React.FC<TitleSelectorProps> = ({ label, onTitleSelect }) =
         try {
             const results = await searchTMDb(q);
             setSuggestions(results.slice(0, 4));
-        } catch (err) { console.error(err); } 
+        } catch (err) { console.error(err); }
         finally { setIsLoading(false); }
     };
 
@@ -49,10 +49,10 @@ const TitleSelector: React.FC<TitleSelectorProps> = ({ label, onTitleSelect }) =
         return (
             <div className="bg-gray-700/50 p-3 rounded-lg text-center h-full flex flex-col justify-between">
                 <div>
-                    <img 
-                        src={selectedTitle.poster_path ? `https://image.tmdb.org/t/p/w185${selectedTitle.poster_path}` : 'https://placehold.co/185x278/374151/9ca3af?text=?'} 
-                        alt="poster" 
-                        className="w-24 h-36 object-cover rounded-md mx-auto mb-2"
+                    <img
+                        src={selectedTitle.poster_path ? `https://image.tmdb.org/t/p/w185${selectedTitle.poster_path}` : 'https://placehold.co/185x278/374151/9ca3af?text=?'}
+                        alt="poster"
+                        className="w-24 h-36 object-cover rounded-md mx-auto mb-2 opacity-70"
                     />
                     <p className="font-bold text-white text-sm">{selectedTitle.title || selectedTitle.name}</p>
                 </div>
@@ -83,25 +83,17 @@ const TitleSelector: React.FC<TitleSelectorProps> = ({ label, onTitleSelect }) =
     );
 };
 
-// --- Componente de Animação da Batalha ---
-interface BattleAnimationProps {
-    poster1?: string;
-    poster2?: string;
-}
-const BattleAnimation: React.FC<BattleAnimationProps> = ({ poster1, poster2 }) => (
+// --- Componente de Animação da Batalha (AGORA COM POEIRA GIRATÓRIA) ---
+const BattleAnimation: React.FC = () => (
     <div className="mt-10 w-full max-w-xl flex flex-col items-center justify-center animate-fade-in">
         <div className="relative w-full h-48 flex justify-center items-center">
-            <img src={poster1 || 'https://placehold.co/150x225/374151/9ca3af?text=?'} alt="Pôster 1" className="w-28 h-42 object-cover rounded-md shadow-lg absolute left-0 animate-duel-left"/>
-            <div className="text-5xl font-black text-gray-500 animate-pulse-fast">VS</div>
-            <img src={poster2 || 'https://placehold.co/150x225/374151/9ca3af?text=?'} alt="Pôster 2" className="w-28 h-42 object-cover rounded-md shadow-lg absolute right-0 animate-duel-right"/>
-            <div className="absolute text-7xl opacity-0 animate-poeira">💥</div>
+            <div className="absolute text-8xl opacity-70 animate-poeira-continua">🌪️</div>
         </div>
-        <h2 className="text-xl font-bold text-gray-400 mt-4 animate-pulse">Duelo em análise...</h2>
+        <h2 className="text-xl font-bold text-gray-400 mt-4 animate-pulse">Gênio pensando...</h2>
     </div>
 );
 
-
-// --- Componente de Exibição do Vencedor ---
+// --- Componente de Exibição do Vencedor (Inalterado) ---
 interface WinnerDisplayProps {
     result: DuelResult;
     onReset: () => void;
@@ -143,15 +135,17 @@ const DuelView: React.FC = () => {
         setIsLoading(true);
         setError(null);
         setResult(null);
-        try {
-            const duelResult = await getDuelAnalysis(title1.title || title1.name || '', title2.title || title2.name || '', watchedData);
-            setResult(duelResult);
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.';
-            setError(`Desculpe, não foi possível fazer a análise. ${errorMessage}`);
-        } finally {
-            setIsLoading(false);
-        }
+        setTimeout(async () => {
+            try {
+                const duelResult = await getDuelAnalysis(title1.title || title1.name || '', title2.title || title2.name || '', watchedData);
+                setResult(duelResult);
+            } catch (err) {
+                const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.';
+                setError(`Desculpe, não foi possível fazer a análise. ${errorMessage}`);
+            } finally {
+                setIsLoading(false);
+            }
+        }, 1500); // Tempo de simulação da análise (com a poeira girando)
     };
 
     const handleReset = () => {
@@ -165,7 +159,13 @@ const DuelView: React.FC = () => {
     // Renderização principal
     let content;
     if (isLoading) {
-        content = <BattleAnimation poster1={title1?.poster_path ? `https://image.tmdb.org/t/p/w185${title1.poster_path}` : undefined} poster2={title2?.poster_path ? `https://image.tmdb.org/t/p/w185${title2.poster_path}` : undefined} />;
+        content = (
+            <div className="w-full max-w-2xl mb-8 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch opacity-50">
+                <TitleSelector label="Desafiante 1" onTitleSelect={setTitle1} />
+                <TitleSelector label="Desafiante 2" onTitleSelect={setTitle2} />
+                <BattleAnimation />
+            </div>
+        );
     } else if (result) {
         content = <WinnerDisplay result={result} onReset={handleReset} />;
     } else {
@@ -195,3 +195,6 @@ const DuelView: React.FC = () => {
 };
 
 export default DuelView;
+
+// Novo keyframe para animação contínua da poeira
+import './index.css'; // Certifique-se de que o arquivo CSS seja importado aqui ou no seu index.tsx
