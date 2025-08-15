@@ -196,5 +196,3 @@ const DuelView: React.FC = () => {
 
 export default DuelView;
 
-// Novo keyframe para animação contínua da poeira
-import './index.css'; // Certifique-se de que o arquivo CSS seja importado aqui ou no seu index.tsx
