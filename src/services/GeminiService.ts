@@ -47,7 +47,7 @@ const recommendationSchema = { /* ... (código existente inalterado) ... */
     },
     required: ["id", "tmdbMediaType", "title", "type", "genre", "synopsis", "probabilities", "analysis"]
 };
-const duelSchema = { /* ... (código existente inalterado) ... */
+const duelSchema = {
     type: Type.OBJECT,
     properties: {
         title1: {
@@ -68,7 +68,11 @@ const duelSchema = { /* ... (código existente inalterado) ... */
             },
             required: ["title", "analysis", "probability"]
         },
-        verdict: { type: Type.STRING, description: "O veredito final do Gênio, recomendando um dos dois títulos e explicando o porquê." }
+        verdict: { 
+            type: Type.STRING, 
+            // ### AQUI ESTÁ A MUDANÇA ###
+            description: "O veredito final do Gênio. Seja criativo, divertido e um pouco dramático. Declare um vencedor claro e explique o porquê de forma descontraída, como se estivesse narrando o final de uma batalha épica. Pode fazer piadas se um dos títulos for obviamente inferior ou um hype passageiro." 
+        }
     },
     required: ["title1", "title2", "verdict"]
 };
