@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useContext } from 'react';
-import { Recommendation, ManagedWatchedItem, MediaType } from '../types';
-import { getPersonalizedSuggestion, SuggestionFilters } from '../services/RecommendationService';
+import { Recommendation, ManagedWatchedItem, MediaType, SuggestionFilters } from '../types'; // Linha Corrigida
+import { getPersonalizedSuggestion } from '../services/RecommendationService';
 import { WatchedDataContext } from '../App';
 import RecommendationCard from './RecommendationCard';
 
+// ... (o restante do arquivo SuggestionView.tsx permanece o mesmo)
 const getTopGenres = (amei: ManagedWatchedItem[], gostei: ManagedWatchedItem[], count = 10): string[] => {
     const genreCounts = new Map<string, number>();
 

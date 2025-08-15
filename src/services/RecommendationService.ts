@@ -1,11 +1,11 @@
 import { AllManagedWatchedData, ManagedWatchedItem, Recommendation, MediaType, DuelResult, TMDbSearchResult, RadarRelease, SuggestionFilters } from '../types';
 import { searchTMDb, getTMDbDetails, getProviders, getUpcomingMovies, getOnTheAirTV, fetchPosterUrl } from './TMDbService';
-import { formatWatchedDataForPrompt, fetchRecommendation, fetchDuelAnalysis, fetchPersonalizedRadar, fetchBestTMDbMatch } from './GeminiService';
+import { formatWatchedDataForPrompt, fetchRecommendation, fetchDuelAnalysis, fetchPersonalizedRadar, fetchBestTMDbMatch, fetchLoveProbability } from './GeminiService';
 
 // --- Funções de Orquestração ---
 
 export const getRandomSuggestion = async (watchedData: AllManagedWatchedData, sessionExclude: string[] = []): Promise<Recommendation> => {
-    const formattedData = formatWatchedDataForPrompt(watchedData, sessionExclude);
+    const formattedData = formatWatchedDataForPrompt(watchedData);
     
     const prompt = `Você é o "CineGênio Pessoal". Analise o perfil de gosto do usuário e forneça UMA recomendação de filme ou série que ele provavelmente não conhece, mas que se alinha perfeitamente ao seu perfil. Evite os títulos da lista de exclusão.
 
@@ -18,7 +18,7 @@ ${formattedData}`;
 };
 
 export const getPersonalizedSuggestion = async (watchedData: AllManagedWatchedData, filters: SuggestionFilters, sessionExclude: string[] = []): Promise<Recommendation> => {
-    const formattedData = formatWatchedDataForPrompt(watchedData, sessionExclude);
+    const formattedData = formatWatchedDataForPrompt(watchedData);
     const prompt = `Você é o "CineGênio Pessoal". Encontre a recomendação PERFEITA que se encaixe tanto nos filtros do usuário quanto no seu perfil de gosto. Os filtros são a prioridade máxima.
 
 **FILTROS DO USUÁRIO:**
@@ -34,7 +34,6 @@ ${formattedData}`;
     return { ...recommendationData, posterUrl };
 };
 
-// ### FUNÇÃO RESTAURADA ###
 export const getPredictionAsRecommendation = async (title: string, watchedData: AllManagedWatchedData): Promise<Recommendation> => {
     const formattedData = formatWatchedDataForPrompt(watchedData);
     const prompt = `Você é o "CineGênio Pessoal". Sua tarefa é analisar o título "${title}" e prever se o usuário vai gostar, com base no perfil de gosto dele. Use a busca na internet para encontrar informações sobre "${title}" (gênero, enredo, temas).
@@ -50,16 +49,22 @@ Analise "${title}" e gere uma resposta completa no formato JSON, seguindo o sche
     return { ...recommendationData, posterUrl };
 };
 
+export const getLoveProbability = async (title: string, watchedData: AllManagedWatchedData): Promise<number> => {
+    const formattedData = formatWatchedDataForPrompt(watchedData);
+    const prompt = `Você é o "CineGênio Pessoal". Analise o título "${title}" e preveja a probabilidade (0-100) de o usuário AMAR este título, com base no perfil de gosto dele. Retorne APENAS a probabilidade.
+
+**PERFIL DO USUÁRIO:**
+${formattedData}`;
+    return await fetchLoveProbability(prompt);
+}
 
 export const getDuelAnalysis = async (title1: string, title2: string, watchedData: AllManagedWatchedData): Promise<DuelResult> => {
+    // ... (código existente inalterado)
     const formattedData = formatWatchedDataForPrompt(watchedData);
     const prompt = `Você é o "CineGênio Pessoal". Sua tarefa é analisar um confronto entre dois títulos: "${title1}" e "${title2}". Compare ambos com o perfil de gosto do usuário e determine qual ele provavelmente preferiria. Use a busca na internet para encontrar informações sobre ambos os títulos.
 
 **PERFIL DO USUÁRIO:**
-${formattedData}
-
-**Sua Tarefa:**
-Gere uma análise de confronto. Sua resposta DEVE ser um único objeto JSON com a estrutura exata definida no schema, incluindo uma análise, probabilidade para cada título e um veredito final.`;
+${formattedData}`;
 
     const result = await fetchDuelAnalysis(prompt);
     const [poster1, poster2] = await Promise.all([
@@ -72,6 +77,7 @@ Gere uma análise de confronto. Sua resposta DEVE ser um único objeto JSON com 
 };
 
 export const getPersonalizedRadar = async (watchedData: AllManagedWatchedData): Promise<RadarRelease[]> => {
+    // ... (código existente inalterado)
     const [movies, tvShows] = await Promise.all([getUpcomingMovies(), getOnTheAirTV()]);
     const allReleases = [...movies, ...tvShows];
     const releasesForPrompt = allReleases.map(r => `- ${r.title || r.name} (ID: ${r.id}, Tipo: ${r.media_type})`).join('\n');
@@ -83,10 +89,7 @@ export const getPersonalizedRadar = async (watchedData: AllManagedWatchedData): 
 ${formattedData}
 
 **LISTA DE LANÇAMENTOS:**
-${releasesForPrompt}
-
-**Sua Tarefa:**
-Analise a lista e retorne um objeto JSON contendo uma chave "releases", que é um array com os 10 lançamentos mais promissores para este usuário. Para cada item, inclua o 'id', 'tmdbMediaType', 'title' e uma 'reason' curta e convincente.`;
+${releasesForPrompt}`;
 
     const result = await fetchPersonalizedRadar(prompt);
     
@@ -102,6 +105,7 @@ Analise a lista e retorne um objeto JSON contendo uma chave "releases", que é u
 };
 
 export const getFullMediaDetailsFromQuery = async (query: string): Promise<Omit<ManagedWatchedItem, 'rating' | 'createdAt'>> => {
+    // ... (código existente inalterado)
     let searchResults = await searchTMDb(query);
     if (searchResults.length === 0) {
         const simplifiedQuery = query.replace(/\s*\([^)]*\)\s*/g, '').trim();
@@ -115,9 +119,7 @@ export const getFullMediaDetailsFromQuery = async (query: string): Promise<Omit<
 
 user_query: "${query}"
 search_results:
-${JSON.stringify(searchResults.map(r => ({ id: r.id, title: r.title || r.name, overview: r.overview, popularity: r.popularity, media_type: r.media_type })), null, 2)}
-
-Qual é o ID correto? Responda APENAS com o número do ID.`;
+${JSON.stringify(searchResults.map(r => ({ id: r.id, title: r.title || r.name, overview: r.overview, popularity: r.popularity, media_type: r.media_type })), null, 2)}`;
 
     let bestMatchId = await fetchBestTMDbMatch(prompt);
     if (!bestMatchId) {

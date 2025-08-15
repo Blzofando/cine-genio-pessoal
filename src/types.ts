@@ -1,5 +1,6 @@
-export type MediaType = 'Filme' | 'Série' | 'Anime' | 'Programa';
+// src/types.ts
 
+export type MediaType = 'Filme' | 'Série' | 'Anime' | 'Programa';
 export type Rating = 'amei' | 'gostei' | 'meh' | 'naoGostei';
 
 export interface WatchProvider {
@@ -36,12 +37,13 @@ export interface WatchlistItem {
   title: string;
   posterUrl?: string;
   addedAt: number;
+  loveProbability?: number; // NOVO CAMPO ADICIONADO AQUI
 }
 
+// ... o restante do arquivo types.ts permanece o mesmo
 export type AllManagedWatchedData = {
   [key in Rating]: ManagedWatchedItem[];
 };
-
 export interface Recommendation {
   id: number;
   tmdbMediaType: 'movie' | 'tv';
@@ -58,7 +60,6 @@ export interface Recommendation {
   analysis: string;
   posterUrl?: string;
 }
-
 export interface DuelResult {
     title1: {
         title: string;
@@ -74,7 +75,6 @@ export interface DuelResult {
     };
     verdict: string;
 }
-
 export interface RadarRelease {
     id: number;
     tmdbMediaType: 'movie' | 'tv';
@@ -83,7 +83,6 @@ export interface RadarRelease {
     releaseDate: string;
     reason: string;
 }
-
 export interface Challenge {
     title: string;
     tmdbId: number;
@@ -93,7 +92,6 @@ export interface Challenge {
     reason: string;
     weekId: string;
 }
-
 export interface TMDbSearchResult {
     id: number;
     title?: string;
@@ -106,13 +104,11 @@ export interface TMDbSearchResult {
     release_date?: string;
     first_air_date?: string;
 }
-
 export type SuggestionFilters = {
     category: MediaType | null;
     genres: string[];
     keywords: string;
 };
-
 export enum View {
   MENU,
   RANDOM,
@@ -124,5 +120,5 @@ export enum View {
   DUEL,
   RADAR,
   CHALLENGE,
-  CHAT // Adicionamos a nova tela de Chat
+  CHAT
 }
