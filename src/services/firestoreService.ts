@@ -1,6 +1,7 @@
 // services/firestoreService.ts
 
 import { db } from './firebaseConfig';
+import { WatchlistItem } from '../types';
 import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc, WriteBatch, writeBatch } from "firebase/firestore";
 import { ManagedWatchedItem, Rating } from '../types';
 
@@ -45,4 +46,23 @@ export const removeWatchedItem = async (id: number): Promise<void> => {
 export const updateWatchedItem = async (id: number, updatedData: Partial<ManagedWatchedItem>): Promise<void> => {
     const itemDocRef = doc(db, COLLECTION_NAME, id.toString());
     await updateDoc(itemDocRef, updatedData);
+};
+// --- NOVAS FUNÇÕES DA WATCHLIST ---
+
+const WATCHLIST_COLLECTION_NAME = 'watchlist';
+
+/**
+ * Adiciona um novo item (documento) à coleção da watchlist.
+ */
+export const addToWatchlist = async (itemData: WatchlistItem): Promise<void> => {
+    const itemDocRef = doc(db, WATCHLIST_COLLECTION_NAME, itemData.id.toString());
+    await setDoc(itemDocRef, itemData);
+};
+
+/**
+ * Remove um item da coleção da watchlist usando seu ID.
+ */
+export const removeFromWatchlist = async (id: number): Promise<void> => {
+    const itemDocRef = doc(db, WATCHLIST_COLLECTION_NAME, id.toString());
+    await deleteDoc(itemDocRef);
 };

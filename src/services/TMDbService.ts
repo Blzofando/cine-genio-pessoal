@@ -1,9 +1,9 @@
-import { WatchProviders, TMDbSearchResult } from "../types"; // Agora importa o TMDbSearchResult
+import { WatchProviders, TMDbSearchResult } from "../types";
 
 const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const BASE_URL = 'https://api.themoviedb.org/3';
 
-// Fila de requisições para evitar erros de rate-limiting (429)
+// Fila de requisições para evitar erros de rate-limiting
 const requestQueue: (() => Promise<any>)[] = [];
 let isProcessing = false;
 const DELAY_BETWEEN_REQUESTS = 250;
@@ -16,7 +16,7 @@ const processQueue = async () => {
         try {
             await requestTask();
         } catch (error) {
-            // O erro é tratado no bloco catch da função que chama
+            // O erro é tratado no bloco catch da função que o chama
         }
     }
     setTimeout(() => {
@@ -33,7 +33,8 @@ const addToQueue = <T>(requestFn: () => Promise<T>): Promise<T> => {
     });
 };
 
-// Função interna para buscar no TMDb
+// --- FUNÇÕES DE BUSCA EXISTENTES ---
+
 const internalSearchTMDb = async (query: string, lang: 'pt-BR' | 'en-US' = 'pt-BR'): Promise<TMDbSearchResult[]> => {
     const url = `${BASE_URL}/search/multi?query=${encodeURIComponent(query)}&include_adult=false&language=${lang}&page=1&api_key=${API_KEY}`;
     const response = await fetch(url, { method: 'GET', headers: { accept: 'application/json' } });
@@ -42,7 +43,6 @@ const internalSearchTMDb = async (query: string, lang: 'pt-BR' | 'en-US' = 'pt-B
     return data.results?.filter((r: any) => (r.media_type === 'movie' || r.media_type === 'tv')) || [];
 };
 
-// Função interna para buscar detalhes de um item
 const internalGetTMDbDetails = async (id: number, mediaType: 'movie' | 'tv') => {
     const url = `${BASE_URL}/${mediaType}/${id}?language=pt-BR&api_key=${API_KEY}&append_to_response=watch/providers,credits`;
     let response = await fetch(url, { method: 'GET', headers: { accept: 'application/json' } });
@@ -54,14 +54,12 @@ const internalGetTMDbDetails = async (id: number, mediaType: 'movie' | 'tv') => 
     return await response.json();
 };
 
-// Funções exportadas que usam a fila para evitar sobrecarga na API
 export const searchTMDb = (query: string, lang: 'pt-BR' | 'en-US' = 'pt-BR') => 
     addToQueue(() => internalSearchTMDb(query, lang));
 
 export const getTMDbDetails = (id: number, mediaType: 'movie' | 'tv') =>
     addToQueue(() => internalGetTMDbDetails(id, mediaType));
 
-// Função para extrair os provedores de "Onde Assistir" para o Brasil
 export const getProviders = (data: any): WatchProviders | undefined => {
     const providers = data?.['watch/providers']?.results?.BR;
     if (!providers) return undefined;
@@ -70,3 +68,41 @@ export const getProviders = (data: any): WatchProviders | undefined => {
         flatrate: providers.flatrate,
     };
 };
+
+export const fetchPosterUrl = async (title: string): Promise<string | null> => {
+    try {
+        const results = await searchTMDb(title.replace(/\s*\(\d{4}\)\s*/, ''));
+        const bestResult = results?.[0];
+        if (bestResult && bestResult.poster_path) {
+            return `https://image.tmdb.org/t/p/w500${bestResult.poster_path}`;
+        }
+        return null;
+    } catch (error) {
+        console.error(`Error fetching poster for "${title}":`, error);
+        return null; 
+    }
+};
+
+// --- NOVAS FUNÇÕES PARA O RADAR ---
+
+const internalGetUpcomingMovies = async (lang: 'pt-BR' | 'en-US' = 'pt-BR'): Promise<TMDbSearchResult[]> => {
+    const url = `${BASE_URL}/movie/upcoming?language=${lang}&page=1&region=BR&api_key=${API_KEY}`;
+    const response = await fetch(url, { method: 'GET', headers: { accept: 'application/json' } });
+    if (!response.ok) throw new Error(`A busca de próximos lançamentos de filmes falhou: ${response.status}`);
+    const data = await response.json();
+    return data.results || [];
+};
+
+const internalGetOnTheAirTV = async (lang: 'pt-BR' | 'en-US' = 'pt-BR'): Promise<TMDbSearchResult[]> => {
+    const url = `${BASE_URL}/tv/on_the_air?language=${lang}&page=1&api_key=${API_KEY}`;
+    const response = await fetch(url, { method: 'GET', headers: { accept: 'application/json' } });
+    if (!response.ok) throw new Error(`A busca de séries no ar falhou: ${response.status}`);
+    const data = await response.json();
+    return data.results || [];
+};
+
+export const getUpcomingMovies = (lang: 'pt-BR' | 'en-US' = 'pt-BR') =>
+    addToQueue(() => internalGetUpcomingMovies(lang));
+
+export const getOnTheAirTV = (lang: 'pt-BR' | 'en-US' = 'pt-BR') =>
+    addToQueue(() => internalGetOnTheAirTV(lang));

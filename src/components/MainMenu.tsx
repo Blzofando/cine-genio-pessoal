@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { View } from '../types';
 
@@ -29,7 +28,12 @@ const MainMenu: React.FC<MainMenuProps> = ({ setView }) => {
         <MenuButton icon="🎲" text="Sugestão Aleatória" onClick={() => setView(View.RANDOM)} />
         <MenuButton icon="💡" text="Sugestão Personalizada" onClick={() => setView(View.SUGGESTION)} />
         <MenuButton icon="🤔" text="Será que vou gostar?" onClick={() => setView(View.PREDICT)} />
+        <MenuButton icon="⚔️" text="Duelo de Títulos" onClick={() => setView(View.DUEL)} />
+        <MenuButton icon="📡" text="Radar de Lançamentos" onClick={() => setView(View.RADAR)} />
+        {/* NOVO BOTÃO ADICIONADO AQUI */}
+        <MenuButton icon="🏆" text="Desafio do Gênio" onClick={() => setView(View.CHALLENGE)} />
         <MenuButton icon="📚" text="Minha Coleção" onClick={() => setView(View.COLLECTION)} />
+        <MenuButton icon="📋" text="Minha Lista para Ver" onClick={() => setView(View.WATCHLIST)} />
         <MenuButton icon="📊" text="Ver Insights" onClick={() => setView(View.STATS)} />
       </div>
     </div>

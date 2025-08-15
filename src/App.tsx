@@ -1,11 +1,15 @@
 import React, { useState, createContext, useEffect, useCallback } from 'react';
+import { WatchlistProvider } from './contexts/WatchlistContext';
 import { View, AllManagedWatchedData, Rating, ManagedWatchedItem } from './types';
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from './services/firebaseConfig';
 import { getFullMediaDetailsFromQuery } from './services/RecommendationService';
 import { addWatchedItem, removeWatchedItem, updateWatchedItem } from './services/firestoreService';
-
+import WatchlistView from './components/WatchlistView';
 import MainMenu from './components/MainMenu';
+import ChallengeView from './components/ChallengeView';
+import RadarView from './components/RadarView';
+import DuelView from './components/DuelView';
 import SuggestionView from './components/SuggestionView';
 import StatsView from './components/StatsView';
 import CollectionView from './components/CollectionView';
@@ -137,6 +141,14 @@ const App: React.FC = () => {
     switch (currentView) {
       case View.MENU:
         return <MainMenu setView={setCurrentView} />;
+      case View.CHALLENGE:
+        return <ViewContainer onBack={handleBackToMenu}><ChallengeView /></ViewContainer>;
+      case View.RADAR:
+        return <ViewContainer onBack={handleBackToMenu}><RadarView /></ViewContainer>;
+      case View.WATCHLIST:
+        return <ViewContainer onBack={handleBackToMenu}><WatchlistView /></ViewContainer>;
+      case View.DUEL:
+        return <ViewContainer onBack={handleBackToMenu}><DuelView /></ViewContainer>;
       case View.SUGGESTION:
         return <ViewContainer onBack={handleBackToMenu}><SuggestionView /></ViewContainer>;
       case View.STATS:
@@ -153,11 +165,13 @@ const App: React.FC = () => {
   };
 
   return (
-    <WatchedDataProvider>
-        <div className="App">
-            {renderView()}
-        </div>
-    </WatchedDataProvider>
+    <WatchlistProvider>
+      <WatchedDataProvider>
+          <div className="App">
+              {renderView()}
+          </div>
+      </WatchedDataProvider>
+  </WatchlistProvider>
   );
 };
 
