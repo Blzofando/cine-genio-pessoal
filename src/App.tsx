@@ -1,9 +1,10 @@
 import React, { useState, createContext, useEffect, useCallback } from 'react';
+import { View, AllManagedWatchedData, Rating, ManagedWatchedItem } from './types';
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from './services/firebaseConfig';
-import { addWatchedItem, removeWatchedItem, updateWatchedItem } from './services/firestoreService';
-import { View, AllManagedWatchedData, Rating, ManagedWatchedItem } from './types';
 import { getFullMediaDetailsFromQuery } from './services/RecommendationService';
+import { addWatchedItem, removeWatchedItem, updateWatchedItem } from './services/firestoreService';
+
 import MainMenu from './components/MainMenu';
 import SuggestionView from './components/SuggestionView';
 import StatsView from './components/StatsView';
@@ -45,37 +46,29 @@ const ViewContainer = ({ children, onBack }: { children: React.ReactNode, onBack
     </div>
 );
 
-// Em App.tsx, substitua o componente WatchedDataProvider por este:
-
 const WatchedDataProvider = ({ children }: { children: React.ReactNode }) => {
     const [data, setData] = useState<AllManagedWatchedData>(initialData);
-    const [loading, setLoading] = useState(true);  // Inicia como true para mostrar que está carregando do Firestore
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    
-    // Efeito para carregar os dados do Firestore e ouvir atualizações em tempo real
+
     useEffect(() => {
         setLoading(true);
         const collectionRef = collection(db, 'watchedItems');
 
-        // onSnapshot cria uma conexão em tempo real.
-        // O código dentro dele será executado sempre que os dados na nuvem mudarem.
         const unsubscribe = onSnapshot(collectionRef, (querySnapshot) => {
             const items: ManagedWatchedItem[] = [];
             querySnapshot.forEach((doc) => {
                 items.push(doc.data() as ManagedWatchedItem);
             });
 
-            // Organiza os itens de volta nas categorias (amei, gostei, etc.)
+            // CORREÇÃO DO BUG: O valor inicial do reduce agora é um objeto novo,
+            // garantindo que os dados não sejam acumulados incorretamente a cada atualização.
             const groupedData = items.reduce((acc, item) => {
-                const rating = item.rating || 'meh'; // Garante que há uma avaliação
-                if (!acc[rating]) {
-                    acc[rating] = [];
-                }
+                const rating = item.rating || 'meh';
                 acc[rating].push(item);
                 return acc;
-            }, initialData as AllManagedWatchedData);
+            }, { amei: [], gostei: [], meh: [], naoGostei: [] } as AllManagedWatchedData);
 
-            // Ordena cada lista por data de criação
             Object.keys(groupedData).forEach(key => {
                 const ratingKey = key as Rating;
                 groupedData[ratingKey].sort((a, b) => b.createdAt - a.createdAt);
@@ -83,17 +76,15 @@ const WatchedDataProvider = ({ children }: { children: React.ReactNode }) => {
             
             setData(groupedData);
             setLoading(false);
-        }, (error) => {
-            console.error("Erro ao buscar dados do Firestore: ", error);
-            setError("Não foi possível carregar sua coleção. Verifique o console para mais detalhes.");
+        }, (err) => {
+            console.error("Erro ao buscar dados do Firestore: ", err);
+            setError("Não foi possível carregar sua coleção.");
             setLoading(false);
         });
 
-        // Retorna uma função de limpeza para se desconectar quando o componente for desmontado
         return () => unsubscribe();
     }, []);
     
-    // Adicionar um item ficou muito mais simples!
     const addItem = useCallback(async (title: string, rating: Rating) => {
         setLoading(true);
         try {
@@ -103,11 +94,7 @@ const WatchedDataProvider = ({ children }: { children: React.ReactNode }) => {
                 rating,
                 createdAt: Date.now(),
             };
-            
-            // Apenas mandamos o novo item para o Firestore.
-            // O 'onSnapshot' cuidará de atualizar o estado (a UI) para nós!
             await addWatchedItem(newItem);
-
         } catch(e) {
             console.error(e);
             throw new Error(e instanceof Error ? e.message : "Falha ao buscar informações do título.");
@@ -116,19 +103,16 @@ const WatchedDataProvider = ({ children }: { children: React.ReactNode }) => {
         }
     }, []);
     
-    // Remover e atualizar também ficaram mais simples
     const removeItem = useCallback(async (id: number) => {
        try {
            await removeWatchedItem(id);
        } catch (error) {
            console.error("Falha ao remover item:", error);
-           // Opcional: mostrar um erro para o usuário
        }
     }, []);
 
     const updateItem = useCallback(async (updatedItem: ManagedWatchedItem) => {
         try {
-            // A função updateWatchedItem espera um objeto com as propriedades a serem atualizadas
             const { id, ...dataToUpdate } = updatedItem;
             await updateWatchedItem(id, dataToUpdate);
         } catch (error) {
