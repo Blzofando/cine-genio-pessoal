@@ -1,11 +1,12 @@
 import React, { useState, createContext, useEffect, useCallback } from 'react';
 import { WatchlistProvider } from './contexts/WatchlistContext';
-import { View, AllManagedWatchedData, Rating, ManagedWatchedItem } from './types';
+import { View, AllManagedWatchedData, Rating, ManagedWatchedItem, SuggestionFilters } from './types'; // Importando SuggestionFilters
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from './services/firebaseConfig';
 import { getFullMediaDetailsFromQuery } from './services/RecommendationService';
 import { addWatchedItem, removeWatchedItem, updateWatchedItem } from './services/firestoreService';
 
+// Importando todos os componentes
 import WatchlistView from './components/WatchlistView';
 import MainMenu from './components/MainMenu';
 import SuggestionView from './components/SuggestionView';
@@ -134,15 +135,32 @@ const WatchedDataProvider = ({ children }: { children: React.ReactNode }) => {
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.MENU);
+  
+  // ### NOVO ESTADO PARA COMUNICAÇÃO ###
+  const [chatFilters, setChatFilters] = useState<SuggestionFilters | null>(null);
 
   const renderView = () => {
     const handleBackToMenu = () => setCurrentView(View.MENU);
     
+    // Função para limpar os filtros após serem usados
+    const clearChatFilters = () => setChatFilters(null);
+
     switch (currentView) {
       case View.MENU:
         return <MainMenu setView={setCurrentView} />;
+      
+      // ### ALTERAÇÃO AQUI ###
+      // Passamos os filtros e a função de limpeza para o SuggestionView
       case View.SUGGESTION:
-        return <ViewContainer onBack={handleBackToMenu}><SuggestionView /></ViewContainer>;
+        return (
+            <ViewContainer onBack={handleBackToMenu}>
+                <SuggestionView 
+                    preloadedFilters={chatFilters} 
+                    clearPreloadedFilters={clearChatFilters} 
+                />
+            </ViewContainer>
+        );
+
       case View.STATS:
         return <ViewContainer onBack={handleBackToMenu}><StatsView /></ViewContainer>;
       case View.COLLECTION:
@@ -159,8 +177,19 @@ const App: React.FC = () => {
         return <ViewContainer onBack={handleBackToMenu}><RadarView /></ViewContainer>;
       case View.CHALLENGE:
         return <ViewContainer onBack={handleBackToMenu}><ChallengeView /></ViewContainer>;
+
+      // ### ALTERAÇÃO AQUI ###
+      // Passamos a função para setar os filtros para o ChatView
       case View.CHAT:
-        return <ViewContainer onBack={handleBackToMenu}><ChatView setView={setCurrentView} /></ViewContainer>;
+        return (
+            <ViewContainer onBack={handleBackToMenu}>
+                <ChatView 
+                    setView={setCurrentView} 
+                    setSuggestionFilters={setChatFilters} 
+                />
+            </ViewContainer>
+        );
+        
       default:
         return <MainMenu setView={setCurrentView} />;
     }
@@ -178,3 +207,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+

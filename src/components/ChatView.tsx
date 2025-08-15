@@ -1,19 +1,48 @@
 import React, { useState } from 'react';
-import { View } from '../types';
+import { View, SuggestionFilters, MediaType } from '../types';
 
 interface ChatViewProps {
     setView: (view: View) => void;
+    setSuggestionFilters: (filters: SuggestionFilters) => void;
 }
 
-const ChatView: React.FC<ChatViewProps> = ({ setView }) => {
+const ChatView: React.FC<ChatViewProps> = ({ setView, setSuggestionFilters }) => {
     const [message, setMessage] = useState('');
 
     const handleSendMessage = () => {
         const lowerCaseMessage = message.toLowerCase();
         
-        // Lógica simples de "roteamento" baseada em palavras-chave
         if (lowerCaseMessage.includes('sugestão') || lowerCaseMessage.includes('recomenda')) {
+            let remainingMessage = ` ${lowerCaseMessage.replace('sugestão de', '').replace('sugestão', '').replace('recomenda', '').trim()} `;
+            
+            const categories: { [key: string]: MediaType } = { 'filme': 'Filme', 'série': 'Série', 'anime': 'Anime', 'programa': 'Programa' };
+            const genres = ['ação', 'comédia', 'drama', 'ficção científica', 'suspense', 'terror', 'romance', 'aventura', 'mistério', 'fantasia'];
+            
+            const foundFilters: SuggestionFilters = { category: null, genres: [], keywords: '' };
+
+            // Procura por categoria
+            for (const key in categories) {
+                if (remainingMessage.includes(` ${key} `)) {
+                    foundFilters.category = categories[key];
+                    remainingMessage = remainingMessage.replace(` ${key} `, ' ');
+                }
+            }
+
+            // Procura por gêneros
+            for (const genre of genres) {
+                if (remainingMessage.includes(` ${genre} `)) {
+                    const capitalizedGenre = genre.charAt(0).toUpperCase() + genre.slice(1);
+                    foundFilters.genres.push(capitalizedGenre);
+                    remainingMessage = remainingMessage.replace(` ${genre} `, ' ');
+                }
+            }
+
+            // O que sobra vira palavra-chave
+            foundFilters.keywords = remainingMessage.trim().replace(/  +/g, ' ');
+
+            setSuggestionFilters(foundFilters);
             setView(View.SUGGESTION);
+
         } else if (lowerCaseMessage.includes('coleção')) {
             setView(View.COLLECTION);
         } else if (lowerCaseMessage.includes('lista') || lowerCaseMessage.includes('watchlist')) {
@@ -25,7 +54,6 @@ const ChatView: React.FC<ChatViewProps> = ({ setView }) => {
         } else if (lowerCaseMessage.includes('desafio')) {
             setView(View.CHALLENGE);
         } else {
-            // Poderíamos adicionar uma resposta padrão da IA aqui no futuro
             alert("Desculpe, ainda não consigo processar esse pedido, mas tente usar palavras como 'sugestão', 'coleção', 'lista', 'duelo', 'radar' ou 'desafio'.");
         }
         setMessage('');
@@ -36,7 +64,7 @@ const ChatView: React.FC<ChatViewProps> = ({ setView }) => {
             <div className="flex-grow flex flex-col items-center justify-center p-4 text-center">
                 <h1 className="text-4xl font-bold text-white mb-2">Fale com o Gênio</h1>
                 <p className="text-lg text-gray-400 max-w-2xl">
-                    O que você gostaria de fazer? Peça por uma "sugestão", para ver sua "coleção", "lista", "duelo" e mais.
+                    Peça por uma "sugestão de filme de terror com suspense" e veja a mágica acontecer.
                 </p>
             </div>
 

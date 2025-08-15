@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useContext } from 'react';
-import { Recommendation, ManagedWatchedItem, MediaType, SuggestionFilters } from '../types'; // Linha Corrigida
+import React, { useState, useMemo, useContext, useEffect } from 'react'; // CORREÇÃO AQUI
+import { Recommendation, ManagedWatchedItem, MediaType, SuggestionFilters } from '../types';
 import { getPersonalizedSuggestion } from '../services/RecommendationService';
 import { WatchedDataContext } from '../App';
 import RecommendationCard from './RecommendationCard';
@@ -40,7 +40,13 @@ const LoadingSpinner = () => (
     </div>
   );
 
-const SuggestionView: React.FC = () => {
+// ### NOVA DEFINIÇÃO DE PROPS ###
+interface SuggestionViewProps {
+    preloadedFilters: SuggestionFilters | null;
+    clearPreloadedFilters: () => void;
+}
+
+const SuggestionView: React.FC<SuggestionViewProps> = ({ preloadedFilters, clearPreloadedFilters }) => {
   const { data: watchedData } = useContext(WatchedDataContext);
   const [filters, setFilters] = useState<SuggestionFilters>({
     category: null,
@@ -51,6 +57,15 @@ const SuggestionView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionSuggestions, setSessionSuggestions] = useState<string[]>([]);
+
+  // ### NOVO EFEITO PARA APLICAR FILTROS ###
+  useEffect(() => {
+    if (preloadedFilters) {
+        setFilters(preloadedFilters); // Aplica os filtros recebidos do chat
+        clearPreloadedFilters();     // Limpa os filtros no App.tsx para não serem usados novamente
+    }
+  }, [preloadedFilters, clearPreloadedFilters]);
+
 
   const topGenres = useMemo(() => getTopGenres(watchedData.amei, watchedData.gostei, 10), [watchedData]);
 
