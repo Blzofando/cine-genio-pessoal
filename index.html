@@ -7,11 +7,8 @@
     <title>CineGênio Pessoal</title>
 
     <meta name="apple-mobile-web-app-capable" content="yes">
-    
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    
     <meta name="apple-mobile-web-app-title" content="CineGênio">
-    
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -25,16 +22,16 @@
       }
     }
     </script>
-    <link rel="stylesheet" href="/index.css">
+    
     <style>
       @keyframes duel-left {
         0% { transform: translateX(0); }
-        100% { transform: translateX(120px); }
+        100% { transform: translateX(100px); }
       }
 
       @keyframes duel-right {
         0% { transform: translateX(0); }
-        100% { transform: translateX(-120px); }
+        100% { transform: translateX(-100px); }
       }
 
       @keyframes poeira {
@@ -46,17 +43,11 @@
         0% { transform: translateY(50px) scale(0.8); opacity: 0; }
         100% { transform: translateY(0) scale(1); opacity: 1; }
       }
-      @keyframes poeira-continua {
-        0% { transform: rotate(0deg) scale(1); opacity: 0.8; }
-        50% { transform: rotate(180deg) scale(1.2); opacity: 0.9; }
-        100% { transform: rotate(360deg) scale(1); opacity: 0.8; }
-      }
 
       .animate-duel-left { animation: duel-left 0.8s ease-in-out forwards; }
       .animate-duel-right { animation: duel-right 0.8s ease-in-out forwards; }
-      .animate-poeira { animation: poeira 1.5s ease-in-out; }
+      .animate-poeira { animation: poeira 1.2s ease-in-out; }
       .animate-trophy-up { animation: trophy-up 0.5s ease-out forwards; }
-      .animate-poeira-continua { animation: poeira-continua 2s linear infinite; }
     </style>
   </head>
   <body class="bg-gray-900 text-white">

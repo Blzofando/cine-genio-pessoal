@@ -4,7 +4,7 @@ import { DuelResult, TMDbSearchResult } from '../types';
 import { getDuelAnalysis } from '../services/RecommendationService';
 import { searchTMDb } from '../services/TMDbService';
 
-// --- Componente de Seleção de Título com Autocomplete (Inalterado) ---
+// --- Componente de Seleção de Título (Inalterado) ---
 interface TitleSelectorProps {
     label: string;
     onTitleSelect: (title: TMDbSearchResult | null) => void;
@@ -26,7 +26,7 @@ const TitleSelector: React.FC<TitleSelectorProps> = ({ label, onTitleSelect }) =
         try {
             const results = await searchTMDb(q);
             setSuggestions(results.slice(0, 4));
-        } catch (err) { console.error(err); }
+        } catch (err) { console.error(err); } 
         finally { setIsLoading(false); }
     };
 
@@ -49,10 +49,10 @@ const TitleSelector: React.FC<TitleSelectorProps> = ({ label, onTitleSelect }) =
         return (
             <div className="bg-gray-700/50 p-3 rounded-lg text-center h-full flex flex-col justify-between">
                 <div>
-                    <img
-                        src={selectedTitle.poster_path ? `https://image.tmdb.org/t/p/w185${selectedTitle.poster_path}` : 'https://placehold.co/185x278/374151/9ca3af?text=?'}
-                        alt="poster"
-                        className="w-24 h-36 object-cover rounded-md mx-auto mb-2 opacity-70"
+                    <img 
+                        src={selectedTitle.poster_path ? `https://image.tmdb.org/t/p/w185${selectedTitle.poster_path}` : 'https://placehold.co/185x278/374151/9ca3af?text=?'} 
+                        alt="poster" 
+                        className="w-24 h-36 object-cover rounded-md mx-auto mb-2"
                     />
                     <p className="font-bold text-white text-sm">{selectedTitle.title || selectedTitle.name}</p>
                 </div>
@@ -83,15 +83,34 @@ const TitleSelector: React.FC<TitleSelectorProps> = ({ label, onTitleSelect }) =
     );
 };
 
-// --- Componente de Animação da Batalha (AGORA COM POEIRA GIRATÓRIA) ---
-const BattleAnimation: React.FC = () => (
-    <div className="mt-10 w-full max-w-xl flex flex-col items-center justify-center animate-fade-in">
-        <div className="relative w-full h-48 flex justify-center items-center">
-            <div className="absolute text-8xl opacity-70 animate-poeira-continua">🌪️</div>
+// --- Componente de Animação da Batalha ---
+interface BattleAnimationProps {
+    poster1?: string;
+    poster2?: string;
+}
+const BattleAnimation: React.FC<BattleAnimationProps> = ({ poster1, poster2 }) => {
+    const [showDust, setShowDust] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setShowDust(true);
+        }, 800); // Mostra a poeira depois que os pôsteres terminam de se mover
+        return () => clearTimeout(timer);
+    }, []);
+
+    return (
+        <div className="mt-10 w-full max-w-xl flex flex-col items-center justify-center animate-fade-in">
+            <div className="relative w-full h-48 flex justify-center items-center">
+                <img src={poster1 || 'https://placehold.co/150x225/374151/9ca3af?text=?'} alt="Pôster 1" className="w-28 h-42 object-cover rounded-md shadow-lg absolute left-0 animate-duel-left"/>
+                <div className={`text-5xl font-black text-gray-500 transition-opacity duration-500 ${showDust ? 'opacity-0' : 'opacity-100'}`}>VS</div>
+                <img src={poster2 || 'https://placehold.co/150x225/374151/9ca3af?text=?'} alt="Pôster 2" className="w-28 h-42 object-cover rounded-md shadow-lg absolute right-0 animate-duel-right"/>
+                {showDust && <div className="absolute text-7xl opacity-0 animate-poeira">💥</div>}
+            </div>
+            <h2 className="text-xl font-bold text-gray-400 mt-4 animate-pulse">Duelo em análise...</h2>
         </div>
-        <h2 className="text-xl font-bold text-gray-400 mt-4 animate-pulse">Gênio pensando...</h2>
-    </div>
-);
+    );
+};
+
 
 // --- Componente de Exibição do Vencedor (Inalterado) ---
 interface WinnerDisplayProps {
@@ -106,10 +125,10 @@ const WinnerDisplay: React.FC<WinnerDisplayProps> = ({ result, onReset }) => {
                 <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-5xl animate-trophy-up">🏆</div>
                 <img src={winner.posterUrl || 'https://placehold.co/200x300/374151/9ca3af?text=?'} alt={`Pôster de ${winner.title}`} className="w-48 h-72 object-cover rounded-md shadow-2xl mb-4 border-4 border-yellow-400"/>
             </div>
-            <h2 className="text-3xl font-bold text-white mt-4">{winner.title}</h2>
+            <h2 className="text-3xl font-bold text-white mt-4 text-center">{winner.title}</h2>
             <div className="mt-4 bg-gray-800 rounded-lg p-4 border border-green-500/50">
                 <h3 className="text-xl font-bold text-green-400 mb-2">Veredito do Gênio</h3>
-                <p className="text-gray-300 italic">{result.verdict}</p>
+                <p className="text-gray-300 italic text-center">{result.verdict}</p>
             </div>
             <button onClick={onReset} className="mt-8 bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-8 rounded-lg text-lg transition-colors">
                 Novo Duelo
@@ -135,17 +154,16 @@ const DuelView: React.FC = () => {
         setIsLoading(true);
         setError(null);
         setResult(null);
-        setTimeout(async () => {
-            try {
-                const duelResult = await getDuelAnalysis(title1.title || title1.name || '', title2.title || title2.name || '', watchedData);
-                setResult(duelResult);
-            } catch (err) {
-                const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.';
-                setError(`Desculpe, não foi possível fazer a análise. ${errorMessage}`);
-            } finally {
-                setIsLoading(false);
-            }
-        }, 1500); // Tempo de simulação da análise (com a poeira girando)
+        try {
+            // A chamada à IA acontece aqui
+            const duelResult = await getDuelAnalysis(title1.title || title1.name || '', title2.title || title2.name || '', watchedData);
+            setResult(duelResult);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.';
+            setError(`Desculpe, não foi possível fazer a análise. ${errorMessage}`);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleReset = () => {
@@ -155,44 +173,34 @@ const DuelView: React.FC = () => {
         setError(null);
         setIsLoading(false);
     };
-
-    // Renderização principal
-    let content;
-    if (isLoading) {
-        content = (
-            <div className="w-full max-w-2xl mb-8 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch opacity-50">
-                <TitleSelector label="Desafiante 1" onTitleSelect={setTitle1} />
-                <TitleSelector label="Desafiante 2" onTitleSelect={setTitle2} />
-                <BattleAnimation />
-            </div>
-        );
-    } else if (result) {
-        content = <WinnerDisplay result={result} onReset={handleReset} />;
-    } else {
-        content = (
-            <>
-                <div className="w-full max-w-2xl mb-8 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
-                    <TitleSelector label="Desafiante 1" onTitleSelect={setTitle1} />
-                    <TitleSelector label="Desafiante 2" onTitleSelect={setTitle2} />
-                </div>
-                <button onClick={handleDuel} disabled={!title1 || !title2} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-12 rounded-lg text-xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
-                    Iniciar Duelo
-                </button>
-            </>
-        );
-    }
-
+    
     return (
-        <div className="flex flex-col items-center p-4 text-center">
-            <h1 className="text-4xl font-bold text-white mb-2">Duelo de Títulos</h1>
-            <p className="text-lg text-gray-400 mb-8 max-w-2xl">
-                Em dúvida entre dois? Deixe o Gênio decidir qual tem mais a ver com você.
-            </p>
-            {content}
-            {error && !isLoading && <p className="mt-8 text-red-400 bg-red-900/50 p-4 rounded-lg w-full max-w-2xl">{error}</p>}
+        <div className="flex flex-col items-center p-4 text-center min-h-[calc(100vh-100px)] justify-center">
+            {isLoading ? (
+                <BattleAnimation 
+                    poster1={title1?.poster_path ? `https://image.tmdb.org/t/p/w185${title1.poster_path}` : undefined} 
+                    poster2={title2?.poster_path ? `https://image.tmdb.org/t/p/w185${title2.poster_path}` : undefined} 
+                />
+            ) : result ? (
+                <WinnerDisplay result={result} onReset={handleReset} />
+            ) : (
+                <>
+                    <h1 className="text-4xl font-bold text-white mb-2">Duelo de Títulos</h1>
+                    <p className="text-lg text-gray-400 mb-8 max-w-2xl">
+                        Em dúvida entre dois? Deixe o Gênio decidir qual tem mais a ver com você.
+                    </p>
+                    <div className="w-full max-w-2xl mb-8 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                        <TitleSelector label="Desafiante 1" onTitleSelect={setTitle1} />
+                        <TitleSelector label="Desafiante 2" onTitleSelect={setTitle2} />
+                    </div>
+                    <button onClick={handleDuel} disabled={!title1 || !title2} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-12 rounded-lg text-xl transition-all duration-300 transform hover:scale-105 shadow-lg disabled:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Iniciar Duelo
+                    </button>
+                    {error && <p className="mt-8 text-red-400 bg-red-900/50 p-4 rounded-lg w-full max-w-2xl">{error}</p>}
+                </>
+            )}
         </div>
     );
 };
 
 export default DuelView;
-
