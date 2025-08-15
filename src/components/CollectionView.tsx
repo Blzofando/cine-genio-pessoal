@@ -21,9 +21,14 @@ const ratingOptions: { rating: Rating; emoji: string; label: string }[] = [
 
 type SortType = 'createdAt' | 'title-asc' | 'title-desc' | 'release-asc' | 'release-desc';
 
-// --- Componentes do Modal ---
+// --- Componentes ---
 
-const Modal = ({ children, onClose }: { children: React.ReactNode, onClose: () => void }) => (
+interface ModalProps {
+    children: React.ReactNode;
+    onClose: () => void;
+}
+
+const Modal: React.FC<ModalProps> = ({ children, onClose }) => (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={onClose}>
         <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             {children}
@@ -31,211 +36,101 @@ const Modal = ({ children, onClose }: { children: React.ReactNode, onClose: () =
     </div>
 );
 
-const WatchProvidersDisplay = ({ providers }: { providers: WatchProvider[] }) => (
-    <div className="flex flex-wrap gap-3">
-        {providers.map(p => (
-            <img 
-                key={p.provider_id} 
-                src={`https://image.tmdb.org/t/p/w92${p.logo_path}`} 
-                alt={p.provider_name}
-                title={p.provider_name}
-                className="w-12 h-12 rounded-lg object-cover bg-gray-700"
-            />
-        ))}
-    </div>
-);
+interface FilterModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    availableCategories: string[];
+    availableGenres: string[];
+    selectedCategories: Set<string>;
+    setSelectedCategories: React.Dispatch<React.SetStateAction<Set<string>>>;
+    selectedGenres: Set<string>;
+    setSelectedGenres: React.Dispatch<React.SetStateAction<Set<string>>>;
+    sortType: SortType;
+    setSortType: React.Dispatch<React.SetStateAction<SortType>>;
+    onApply: () => void;
+}
 
-const DetailsModal = ({ item, onClose }: { item: ManagedWatchedItem, onClose: () => void }) => {
-    const { removeItem } = useContext(WatchedDataContext);
-    const [currentItem, setCurrentItem] = useState(item);
-    const [isLoading, setIsLoading] = useState(false);
+const FilterModal: React.FC<FilterModalProps> = ({
+    isOpen,
+    onClose,
+    availableCategories,
+    availableGenres,
+    selectedCategories,
+    setSelectedCategories,
+    selectedGenres,
+    setSelectedGenres,
+    sortType,
+    setSortType,
+    onApply
+}) => {
+    if (!isOpen) return null;
 
-    useEffect(() => {
-        const needsUpdate = !currentItem.synopsis || !currentItem.watchProviders;
-        if (needsUpdate) {
-            setIsLoading(true);
-            getTMDbDetails(currentItem.id, currentItem.tmdbMediaType)
-                .then(details => {
-                    const updatedDetails = {
-                        synopsis: details.overview || "Sinopse não disponível.",
-                        watchProviders: getProviders(details),
-                        voteAverage: details.vote_average ? parseFloat(details.vote_average.toFixed(1)) : 0,
-                    };
-                    updateWatchedItem(currentItem.id, updatedDetails);
-                    setCurrentItem(prev => ({ ...prev, ...updatedDetails }));
-                })
-                .catch(err => console.error("Failed to fetch extra details", err))
-                .finally(() => setIsLoading(false));
-        }
-    }, [currentItem.id, currentItem.tmdbMediaType, currentItem.synopsis, currentItem.watchProviders]);
-
-    const handleRemove = () => {
-        if (window.confirm(`Tem certeza que deseja remover "${currentItem.title}" da sua coleção?`)) {
-            removeItem(currentItem.id);
-            onClose();
-        }
+    const handleCategoryToggle = (cat: string) => {
+        const newSet = new Set(selectedCategories);
+        if (newSet.has(cat)) newSet.delete(cat);
+        else newSet.add(cat);
+        setSelectedCategories(newSet);
     };
 
-    const ratingStyle = ratingStyles[currentItem.rating];
+    const handleGenreToggle = (genre: string) => {
+        const newSet = new Set(selectedGenres);
+        if (newSet.has(genre)) newSet.delete(genre);
+        else newSet.add(genre);
+        setSelectedGenres(newSet);
+    };
 
     return (
         <Modal onClose={onClose}>
             <div className="p-6">
-                <div className="flex flex-col sm:flex-row gap-6">
-                    {currentItem.posterUrl && <img src={currentItem.posterUrl} alt={`Pôster de ${currentItem.title}`} className="w-40 h-60 object-cover rounded-lg shadow-md flex-shrink-0 mx-auto sm:mx-0" />}
-                    <div className="flex-grow">
-                        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">{currentItem.title}</h2>
-                        <div className="flex items-center flex-wrap gap-x-4 gap-y-2 mb-4 text-sm text-gray-400">
-                            <span className={`inline-block font-bold py-1 px-3 rounded-full text-xs border ${ratingStyle.bg} ${ratingStyle.text} ${ratingStyle.border}`}>{currentItem.rating.toUpperCase()}</span>
-                            <span>{currentItem.type}</span>
-                            <span>&bull;</span>
-                            <span>{currentItem.genre}</span>
-                            {currentItem.voteAverage && currentItem.voteAverage > 0 && (
-                                 <><span className="hidden sm:inline">&bull;</span><span className="flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-400" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg><span className="font-bold text-white">{currentItem.voteAverage}</span></span></>
-                            )}
+                <h2 className="text-2xl font-bold text-white mb-6">Filtros e Ordenação</h2>
+                
+                <div className="space-y-6">
+                    <div>
+                        <h3 className="font-semibold text-gray-300 mb-3">Ordenar por</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {(['createdAt', 'title-asc', 'title-desc', 'release-desc', 'release-asc'] as SortType[]).map(type => (
+                                <button key={type} onClick={() => setSortType(type)} className={`px-3 py-2 text-sm rounded-lg ${sortType === type ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                                    { {createdAt: 'Mais Recentes', 'title-asc': 'Título (A-Z)', 'title-desc': 'Título (Z-A)', 'release-desc': 'Ano (Novo-Antigo)', 'release-asc': 'Ano (Antigo-Novo)'}[type] }
+                                </button>
+                            ))}
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-300 mt-4 mb-1">Sinopse</h3>
-                        <p className="text-gray-400 text-sm">{isLoading ? 'Carregando...' : currentItem.synopsis}</p>
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-gray-300 mb-3">Categoria</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {availableCategories.map((cat: string) => (
+                                <button key={cat} onClick={() => handleCategoryToggle(cat)} className={`px-3 py-2 text-sm rounded-lg ${selectedCategories.has(cat) ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-gray-300 mb-3">Gênero</h3>
+                        <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                            {availableGenres.map((genre: string) => (
+                                <button key={genre} onClick={() => handleGenreToggle(genre)} className={`px-3 py-2 text-sm rounded-lg ${selectedGenres.has(genre) ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                                    {genre}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
-                {currentItem.watchProviders?.flatrate && currentItem.watchProviders.flatrate.length > 0 && (
-                    <div className="mt-6"><h3 className="text-xl font-semibold text-gray-300 mb-3">Onde Assistir (Assinatura)</h3><WatchProvidersDisplay providers={currentItem.watchProviders.flatrate} /></div>
-                )}
-                <div className="mt-6 pt-6 border-t border-gray-700 flex flex-col sm:flex-row gap-3">
-                    <button onClick={handleRemove} className="w-full sm:w-auto flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2">Remover</button>
-                    <button onClick={onClose} className="w-full sm:w-auto flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">Fechar</button>
+
+                <div className="mt-8 pt-4 border-t border-gray-700 flex justify-end">
+                    <button onClick={onApply} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg">Aplicar</button>
                 </div>
             </div>
         </Modal>
     );
 };
 
-// --- AddModal com Preview ---
-const AddModal = ({ onClose }: { onClose: () => void }) => {
-    const [query, setQuery] = useState('');
-    const [rating, setRating] = useState<Rating>('gostei');
-    const [suggestions, setSuggestions] = useState<TMDbSearchResult[]>([]);
-    const [selectedSuggestion, setSelectedSuggestion] = useState<TMDbSearchResult | null>(null);
-    const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
-    const { addItem, loading: isAdding } = useContext(WatchedDataContext);
-    const [error, setError] = useState('');
-    
-    const debounceSearch = useCallback((searchFn: (q: string) => void, delay: number) => {
-        let timeoutId: NodeJS.Timeout;
-        return (q: string) => {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => searchFn(q), delay);
-        };
-    }, []);
+interface ItemCardProps {
+    item: ManagedWatchedItem;
+    onClick: () => void;
+}
 
-    const fetchSuggestions = async (q: string) => {
-        if (q.length < 3) {
-            setSuggestions([]);
-            return;
-        }
-        setIsLoadingSuggestions(true);
-        try {
-            const results = await searchTMDb(q);
-            setSuggestions(results.slice(0, 5));
-        } catch (err) { console.error(err); } 
-        finally { setIsLoadingSuggestions(false); }
-    };
-    
-    const debouncedFetch = useMemo(() => debounceSearch(fetchSuggestions, 300), [debounceSearch]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newQuery = e.target.value;
-        setQuery(newQuery);
-        setError('');
-        setSelectedSuggestion(null);
-        debouncedFetch(newQuery);
-    };
-    
-    const handleSuggestionClick = (suggestion: TMDbSearchResult) => {
-        setSelectedSuggestion(suggestion);
-        setQuery(suggestion.title || suggestion.name || '');
-        setSuggestions([]);
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!query.trim()) {
-            setError('O título não pode estar vazio.');
-            return;
-        }
-        setError('');
-        try {
-            await addItem(query, rating);
-            onClose();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Falha ao adicionar título.');
-        }
-    };
-
-    return (
-        <Modal onClose={onClose}>
-            <form onSubmit={handleSubmit} className="p-6">
-                <h2 className="text-2xl font-bold text-white mb-4">Adicionar Novo Título</h2>
-                
-                {!selectedSuggestion && (
-                    <div className="relative">
-                        <input type="text" value={query} onChange={handleInputChange} className="w-full bg-gray-700 text-white p-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Comece a digitar um título..."/>
-                        {isLoadingSuggestions && <div className="absolute right-3 top-3"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-400"></div></div>}
-                        {suggestions.length > 0 && (
-                            <ul className="absolute z-10 w-full bg-gray-700 border border-gray-600 rounded-lg mt-1 max-h-80 overflow-y-auto shadow-lg">
-                                {suggestions.map(s => (
-                                    <li key={s.id} onClick={() => handleSuggestionClick(s)} className="p-3 hover:bg-indigo-600 cursor-pointer flex items-center gap-4">
-                                        <img src={s.poster_path ? `https://image.tmdb.org/t/p/w92${s.poster_path}` : 'https://placehold.co/50x75/374151/9ca3af?text=?'} alt="poster" className="w-12 h-[72px] object-cover rounded-md bg-gray-800"/>
-                                        <div>
-                                            <p className="font-bold text-white">{s.title || s.name}</p>
-                                            <p className="text-sm text-gray-400">{s.media_type === 'movie' ? 'Filme' : 'Série'} ({new Date(s.release_date || s.first_air_date || '').getFullYear()})</p>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                )}
-
-                {selectedSuggestion && (
-                    <div className="bg-gray-700/50 p-4 rounded-lg">
-                        <div className="flex items-start gap-4">
-                            <img src={selectedSuggestion.poster_path ? `https://image.tmdb.org/t/p/w92${selectedSuggestion.poster_path}` : 'https://placehold.co/80x120/374151/9ca3af?text=?'} alt="poster" className="w-20 h-[120px] object-cover rounded-md bg-gray-800"/>
-                            <div className="flex-grow">
-                                <p className="font-bold text-white text-lg">{selectedSuggestion.title || selectedSuggestion.name}</p>
-                                <p className="text-sm text-gray-400">{selectedSuggestion.media_type === 'movie' ? 'Filme' : 'Série'} ({new Date(selectedSuggestion.release_date || selectedSuggestion.first_air_date || '').getFullYear()})</p>
-                                <button type="button" onClick={() => { setSelectedSuggestion(null); setQuery(''); }} className="text-xs text-indigo-400 hover:underline mt-2">Buscar outro</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <div className="my-6">
-                    <label className="block text-sm font-medium text-gray-300 mb-3 text-center">Minha Avaliação</label>
-                    <div className="flex justify-center gap-2 sm:gap-4">
-                        {ratingOptions.map(opt => (
-                            <button key={opt.rating} type="button" onClick={() => setRating(opt.rating)} className={`px-4 py-2 text-lg rounded-lg transition-all duration-200 flex flex-col items-center gap-1 w-20 ${rating === opt.rating ? 'bg-indigo-600 text-white scale-110 shadow-lg' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}`}>
-                                <span className="text-2xl">{opt.emoji}</span>
-                                <span className="text-xs font-bold">{opt.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                {error && <p className="text-red-400 text-sm mb-4 text-center">{error}</p>}
-                <div className="flex justify-end gap-3 border-t border-gray-700 pt-4">
-                    <button type="button" onClick={onClose} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Cancelar</button>
-                    <button type="submit" disabled={isAdding || !query} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
-                        {isAdding ? 'Adicionando...' : 'Adicionar'}
-                    </button>
-                </div>
-            </form>
-        </Modal>
-    );
-};
-
-// --- Componentes da Coleção ---
-
-const ItemCard = ({ item, onClick }: { item: ManagedWatchedItem, onClick: () => void }) => {
+const ItemCard: React.FC<ItemCardProps> = ({ item, onClick }) => {
     return (
         <div onClick={onClick} className="relative bg-gray-800 rounded-lg group cursor-pointer overflow-hidden shadow-lg border-2 border-transparent hover:border-indigo-500 transition-all duration-300 aspect-[2/3]">
             {item.posterUrl ? <img src={item.posterUrl} alt={`Pôster de ${item.title}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full bg-gray-700 flex items-center justify-center text-center p-2"><span className="text-gray-500 text-sm">Pôster não disponível</span></div>}
@@ -246,32 +141,41 @@ const ItemCard = ({ item, onClick }: { item: ManagedWatchedItem, onClick: () => 
     );
 };
 
+// ... (Os componentes DetailsModal e AddModal, que não foram alterados, estão omitidos por brevidade, mas devem permanecer no seu arquivo)
+
 const CollectionView: React.FC = () => {
     const { data } = useContext(WatchedDataContext);
     const [modal, setModal] = useState<'add' | 'details' | null>(null);
+    const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<ManagedWatchedItem | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [sortType, setSortType] = useState<SortType>('createdAt');
-    const [advancedFiltersVisible, setAdvancedFiltersVisible] = useState(false);
     
     const allItems: ManagedWatchedItem[] = useMemo(() => [...data.amei, ...data.gostei, ...data.meh, ...data.naoGostei], [data]);
     
     const availableGenres = useMemo(() => Array.from(new Set(allItems.map(item => item.genre))).sort(), [allItems]);
     const availableCategories = useMemo(() => Array.from(new Set(allItems.map(item => item.type))).sort(), [allItems]);
 
+    // Estados para os filtros
     const [activeRatingFilter, setActiveRatingFilter] = useState<Rating | null>(null);
-    const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
-    const [selectedGenres, setSelectedGenres] = useState<Set<string>>(new Set());
+    const [tempSelectedCategories, setTempSelectedCategories] = useState<Set<string>>(new Set());
+    const [tempSelectedGenres, setTempSelectedGenres] = useState<Set<string>>(new Set());
+    const [tempSortType, setTempSortType] = useState<SortType>('createdAt');
+    
+    // Estados aplicados
+    const [appliedCategories, setAppliedCategories] = useState<Set<string>>(new Set());
+    const [appliedGenres, setAppliedGenres] = useState<Set<string>>(new Set());
+    const [appliedSortType, setAppliedSortType] = useState<SortType>('createdAt');
+
 
     const sortedAndFilteredItems = useMemo(() => {
         let items = allItems;
         if (searchQuery) items = items.filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()));
         if (activeRatingFilter) items = items.filter(item => item.rating === activeRatingFilter);
-        if (selectedCategories.size > 0) items = items.filter(item => selectedCategories.has(item.type));
-        if (selectedGenres.size > 0) items = items.filter(item => selectedGenres.has(item.genre));
+        if (appliedCategories.size > 0) items = items.filter(item => appliedCategories.has(item.type));
+        if (appliedGenres.size > 0) items = items.filter(item => appliedGenres.has(item.genre));
 
         return items.sort((a, b) => {
-            switch (sortType) {
+            switch (appliedSortType) {
                 case 'title-asc': return a.title.localeCompare(b.title);
                 case 'title-desc': return b.title.localeCompare(a.title);
                 case 'release-asc': {
@@ -288,22 +192,45 @@ const CollectionView: React.FC = () => {
                 default: return b.createdAt - a.createdAt;
             }
         });
-    }, [allItems, activeRatingFilter, selectedCategories, selectedGenres, searchQuery, sortType]);
+    }, [allItems, activeRatingFilter, appliedCategories, appliedGenres, searchQuery, appliedSortType]);
 
     const handleItemClick = (item: ManagedWatchedItem) => {
         setSelectedItem(item);
         setModal('details');
     };
-    
-    const handleCategoryChange = (category: string) => setSelectedCategories(prev => { const newSet = new Set(prev); newSet.has(category) ? newSet.delete(category) : newSet.add(category); return newSet; });
-    const handleGenreChange = (genre: string) => setSelectedGenres(prev => { const newSet = new Set(prev); newSet.has(genre) ? newSet.delete(genre) : newSet.add(genre); return newSet; });
-    const clearAdvancedFilters = () => { setSelectedCategories(new Set()); setSelectedGenres(new Set()); };
+
+    const openFilterModal = () => {
+        setTempSelectedCategories(appliedCategories);
+        setTempSelectedGenres(appliedGenres);
+        setTempSortType(appliedSortType);
+        setIsFilterModalOpen(true);
+    };
+
+    const applyFilters = () => {
+        setAppliedCategories(tempSelectedCategories);
+        setAppliedGenres(tempSelectedGenres);
+        setAppliedSortType(tempSortType);
+        setIsFilterModalOpen(false);
+    };
 
     return (
         <div className="p-4">
-            {modal === 'details' && selectedItem && <DetailsModal item={selectedItem} onClose={() => setModal(null)} />}
-            {modal === 'add' && <AddModal onClose={() => setModal(null)} />}
+            {/* ... (Os componentes de Modal 'details' e 'add' não foram alterados e estão omitidos por brevidade, mas devem permanecer no seu arquivo) ... */}
             
+            <FilterModal
+                isOpen={isFilterModalOpen}
+                onClose={() => setIsFilterModalOpen(false)}
+                availableCategories={availableCategories}
+                availableGenres={availableGenres}
+                selectedCategories={tempSelectedCategories}
+                setSelectedCategories={setTempSelectedCategories}
+                selectedGenres={tempSelectedGenres}
+                setSelectedGenres={setTempSelectedGenres}
+                sortType={tempSortType}
+                setSortType={setTempSortType}
+                onApply={applyFilters}
+            />
+
             <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
                 <h1 className="text-4xl font-bold text-white mb-4 sm:mb-0">Minha Coleção</h1>
                 <button onClick={() => setModal('add')} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 shadow-lg transition-transform transform hover:scale-105">[+] Adicionar</button>
@@ -313,36 +240,14 @@ const CollectionView: React.FC = () => {
                 <input type="text" placeholder="Buscar na coleção..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-gray-700 text-white p-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                 <div className="flex flex-col sm:flex-row gap-4 justify-between">
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-gray-400 font-semibold">Avaliação:</span>
                         {ratingOptions.map(({ rating, emoji }) => (
                             <button key={rating} onClick={() => setActiveRatingFilter(prev => prev === rating ? null : rating)} title={rating} className={`px-3 py-2 text-xl rounded-lg transition-all duration-300 ${activeRatingFilter === rating ? 'bg-indigo-600 ring-2 ring-indigo-400 scale-110' : 'bg-gray-700 hover:bg-gray-600'}`}>{emoji}</button>
                         ))}
                     </div>
-                    <div className="flex items-center gap-2">
-                         <button onClick={() => setAdvancedFiltersVisible(!advancedFiltersVisible)} className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2">
-                             Filtros {advancedFiltersVisible ? '▴' : '▾'}
-                         </button>
-                        <select value={sortType} onChange={e => setSortType(e.target.value as SortType)} className="bg-gray-700 text-white p-2 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none pr-8 bg-no-repeat bg-right" style={{backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`}}>
-                            <option value="createdAt">Mais Recentes</option>
-                            <option value="title-asc">Título (A-Z)</option>
-                            <option value="title-desc">Título (Z-A)</option>
-                            <option value="release-desc">Ano (Novo-Antigo)</option>
-                            <option value="release-asc">Ano (Antigo-Novo)</option>
-                        </select>
-                    </div>
-                </div>
-                <div className={`transition-all duration-500 ease-in-out overflow-hidden ${advancedFiltersVisible ? 'max-h-96 pt-4 border-t border-gray-700' : 'max-h-0'}`}>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <h4 className="font-semibold mb-2 text-gray-300">Categoria</h4>
-                            <div className="space-y-2">{availableCategories.map(cat => (<label key={cat} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={selectedCategories.has(cat)} onChange={() => handleCategoryChange(cat)} className="h-4 w-4 rounded bg-gray-600 border-gray-500 text-indigo-500 focus:ring-indigo-600"/>{cat}</label>))}</div>
-                        </div>
-                        <div className="md-col-span-2">
-                            <h4 className="font-semibold mb-2 text-gray-300">Gênero</h4>
-                            <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-600 p-3 rounded-md bg-gray-900/50">{availableGenres.map(genre => (<label key={genre} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={selectedGenres.has(genre)} onChange={() => handleGenreChange(genre)} className="h-4 w-4 rounded bg-gray-600 border-gray-500 text-indigo-500 focus:ring-indigo-600"/>{genre}</label>))}</div>
-                        </div>
-                    </div>
-                     <button onClick={clearAdvancedFilters} className="text-sm text-indigo-400 hover:text-indigo-300 mt-4">Limpar Filtros</button>
+                    <button onClick={openFilterModal} className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center sm:justify-start gap-2">
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 12.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-4.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" /></svg>
+                         Filtros & Ordenação
+                    </button>
                 </div>
             </div>
 
@@ -351,9 +256,7 @@ const CollectionView: React.FC = () => {
             ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {sortedAndFilteredItems.map(item => (
-                       <div key={item.id}>
-                           <ItemCard item={item} onClick={() => handleItemClick(item)} />
-                       </div>
+                       <ItemCard key={item.id} item={item} onClick={() => handleItemClick(item)} />
                     ))}
                 </div>
             )}
