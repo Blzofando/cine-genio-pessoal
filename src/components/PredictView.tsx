@@ -1,7 +1,8 @@
 import React, { useState, useContext } from 'react';
-import { PredictionResult } from '../types';
-import { getPrediction } from '../services/RecommendationService';
+import { Recommendation } from '../types';
+import { getPredictionAsRecommendation } from '../services/RecommendationService';
 import { WatchedDataContext } from '../App';
+import RecommendationCard from './RecommendationCard'; // Importamos o card!
 
 const LoadingSpinner = () => (
     <div className="flex flex-col items-center justify-center space-y-2 mt-8">
@@ -13,7 +14,8 @@ const LoadingSpinner = () => (
 const PredictView: React.FC = () => {
   const { data: watchedData } = useContext(WatchedDataContext);
   const [title, setTitle] = useState('');
-  const [result, setResult] = useState<PredictionResult | null>(null);
+  // O estado agora armazena uma 'Recommendation' completa
+  const [result, setResult] = useState<Recommendation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +28,8 @@ const PredictView: React.FC = () => {
     setError(null);
     setResult(null);
     try {
-      const predictionResult = await getPrediction(title, watchedData);
+      // Chamamos a nova função que retorna o objeto completo
+      const predictionResult = await getPredictionAsRecommendation(title, watchedData);
       setResult(predictionResult);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.';
@@ -35,15 +38,6 @@ const PredictView: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-  
-  const getVerdictChipStyle = (prediction: string): string => {
-    const p = prediction.toUpperCase();
-    if (p.includes('AMAR')) return 'bg-green-500/20 text-green-300 border-green-500';
-    if (p.includes('GOSTAR')) return 'bg-indigo-500/20 text-indigo-300 border-indigo-500';
-    if (p.includes('RESSALVAS')) return 'bg-yellow-500/20 text-yellow-300 border-yellow-500';
-    if (p.includes('NÃO É PARA VOCÊ') || p.includes('NÃO GOSTAR')) return 'bg-red-500/20 text-red-300 border-red-500';
-    return 'bg-gray-500/20 text-gray-300 border-gray-500';
   };
 
   return (
@@ -80,15 +74,9 @@ const PredictView: React.FC = () => {
       {isLoading && <LoadingSpinner />}
       {error && <p className="mt-4 text-red-400 bg-red-900/50 p-4 rounded-lg w-full max-w-lg">{error}</p>}
 
-      {result && (
-        <div className="mt-8 w-full max-w-2xl animate-fade-in" role="alert">
-            <div className="bg-gray-800 rounded-lg shadow-2xl p-6 text-left border border-gray-700">
-              <div className={`inline-block font-bold py-1 px-3 rounded-full text-lg mb-4 border ${getVerdictChipStyle(result.prediction)}`}>
-                  {result.prediction}
-              </div>
-              <p className="text-gray-300 text-lg whitespace-pre-wrap">{result.reason}</p>
-            </div>
-        </div>
+      {/* A mágica acontece aqui: usamos o mesmo card das outras telas! */}
+      {result && !isLoading && (
+        <RecommendationCard recommendation={result} />
       )}
     </div>
   );

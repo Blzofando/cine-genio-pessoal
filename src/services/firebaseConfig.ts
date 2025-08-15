@@ -5,12 +5,12 @@ import { getFirestore } from "firebase/firestore";
 
 // TODO: Substitua o objeto abaixo pelas credenciais do SEU projeto Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyB8484n2o2Ab4OjTis-xAEwHQJYWMKL1xU",
-  authDomain: "cine-genio-pessoal.firebaseapp.com",
-  projectId: "cine-genio-pessoal",
-  storageBucket: "cine-genio-pessoal.firebasestorage.app",
-  messagingSenderId: "396991223598",
-  appId: "1:396991223598:web:19770601cafe22449a8cbf"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Inicializa o Firebase

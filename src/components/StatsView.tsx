@@ -2,6 +2,7 @@ import React, { useContext, useMemo } from 'react';
 import { WatchedDataContext } from '../App';
 import { ManagedWatchedItem, Rating, MediaType } from '../types';
 
+// Estilos para cada tipo de avaliação
 const ratingStyles: Record<Rating, { color: string, name: string }> = {
     amei: { color: '#4ade80', name: 'Amei' },       // green-400
     gostei: { color: '#818cf8', name: 'Gostei' },    // indigo-400
@@ -9,6 +10,7 @@ const ratingStyles: Record<Rating, { color: string, name: string }> = {
     naoGostei: { color: '#f87171', name: 'Não Gostei' } // red-400
 };
 
+// Componente para o gráfico de pizza
 const PieChart = ({ data }: { data: Record<Rating, number> }) => {
     const total = Object.values(data).reduce((acc, val) => acc + val, 0);
     if (total === 0) return <div className="h-48 w-48 bg-gray-700 rounded-full flex items-center justify-center"><span className="text-gray-500">Sem dados</span></div>;
@@ -43,13 +45,12 @@ const PieChart = ({ data }: { data: Record<Rating, number> }) => {
     );
 };
 
+// Componente para o gráfico de barras
 const BarChart = ({ data }: { data: { genre: string, count: number }[] }) => {
     if (data.length === 0) {
         return <div className="h-64 flex items-center justify-center text-gray-500">Adicione itens à lista 'Amei' para ver seus gêneros favoritos.</div>;
     }
     const maxCount = Math.max(...data.map(d => d.count), 1);
-    const barHeight = 32;
-    const gap = 12;
 
     return (
         <div className="w-full space-y-3">
@@ -74,8 +75,9 @@ const BarChart = ({ data }: { data: { genre: string, count: number }[] }) => {
 const StatsView: React.FC = () => {
   const { data } = useContext(WatchedDataContext);
 
+  // Calcula as estatísticas. As correções de tipo foram aplicadas aqui.
   const stats = useMemo(() => {
-    const allItems = Object.values(data).flat();
+    const allItems = Object.values(data).flat() as ManagedWatchedItem[];
     if (allItems.length === 0) return null;
 
     const ratingsCount = {
@@ -85,24 +87,27 @@ const StatsView: React.FC = () => {
         naoGostei: data.naoGostei.length,
     };
 
+    // CORREÇÃO: Adicionamos 'as Record<MediaType, number>' para tipar o objeto inicial do reduce.
     const typeCount = allItems.reduce((acc, item) => {
       acc[item.type] = (acc[item.type] || 0) + 1;
       return acc;
     }, {} as Record<MediaType, number>);
 
+    // CORREÇÃO: Adicionamos 'as Record<string, number>' para tipar o objeto inicial do reduce.
     const ameiGenres = data.amei.reduce((acc, item) => {
       acc[item.genre] = (acc[item.genre] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
     const topGenres = Object.entries(ameiGenres)
-      .sort(([, a], [, b]) => b - a)
+      .sort(([, a], [, b]) => Number(b) - Number(a))
       .slice(0, 5)
       .map(([genre, count]) => ({ genre, count }));
 
     return { totalItems: allItems.length, ratingsCount, typeCount, topGenres };
   }, [data]);
 
+  // Tela de carregamento enquanto as estatísticas são calculadas
   if (!stats) {
     return (
         <div className="flex flex-col items-center p-4 text-center">
@@ -115,7 +120,7 @@ const StatsView: React.FC = () => {
     );
   }
 
-  const totalRatings = Object.values(stats.ratingsCount).reduce((a, b) => a + b, 0);
+  const totalRatings: number = Object.values<number>(stats.ratingsCount).reduce((a, b) => a + b, 0);
 
   return (
     <div className="p-4 animate-fade-in">
