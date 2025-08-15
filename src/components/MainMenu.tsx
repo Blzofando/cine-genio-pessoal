@@ -13,47 +13,27 @@ const MenuButton = ({ icon, text, onClick }: { icon: string, text: string, onCli
       <span className="text-2xl">{icon}</span>
       <span className="text-lg">{text}</span>
     </button>
-);
-
-const FooterButton = ({ icon, text, onClick }: { icon: string, text: string, onClick: () => void }) => (
-    <button onClick={onClick} className="flex flex-col items-center gap-1 text-gray-400 hover:text-indigo-400 transition-colors">
-        <span className="text-2xl">{icon}</span>
-        <span className="text-xs font-semibold">{text}</span>
-    </button>
-);
-
+  );
 
 const MainMenu: React.FC<MainMenuProps> = ({ setView }) => {
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-between p-4">
-      {/* Espaçador para empurrar o conteúdo para o centro */}
-      <div></div>
-
-      <div className="w-full flex flex-col items-center">
-        <div className="text-center mb-10">
-            <h1 className="text-5xl font-extrabold text-white tracking-tight">
-            CineGênio <span className="text-indigo-400">Pessoal</span>
-            </h1>
-            <p className="mt-4 text-xl text-gray-400">Seu assistente de cinema e séries.</p>
-        </div>
-        
-        <div className="w-full max-w-md space-y-4">
-            <MenuButton icon="💬" text="Fale com o Gênio" onClick={() => setView(View.CHAT)} />
-            <MenuButton icon="🎲" text="Sugestão Aleatória" onClick={() => setView(View.RANDOM)} />
-            <MenuButton icon="💡" text="Sugestão Personalizada" onClick={() => setView(View.SUGGESTION)} />
-            <MenuButton icon="📡" text="Radar de Lançamentos" onClick={() => setView(View.RADAR)} />
-            <MenuButton icon="⚔️" text="Duelo de Títulos" onClick={() => setView(View.DUEL)} />
-            <MenuButton icon="🏆" text="Desafio do Gênio" onClick={() => setView(View.CHALLENGE)} />
-        </div>
+    <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4">
+      <div className="text-center mb-12">
+        <h1 className="text-5xl font-extrabold text-white tracking-tight">
+          CineGênio <span className="text-indigo-400">Pessoal</span>
+        </h1>
+        <p className="mt-4 text-xl text-gray-400">Seu assistente de cinema e séries.</p>
       </div>
-
-      {/* --- NOVO RODAPÉ MEU PERFIL --- */}
-      <div className="w-full max-w-md py-4 mt-10 border-t border-gray-700">
-        <div className="flex justify-around items-center">
-            <FooterButton icon="📚" text="Minha Coleção" onClick={() => setView(View.COLLECTION)} />
-            <FooterButton icon="📋" text="Watchlist" onClick={() => setView(View.WATCHLIST)} />
-            <FooterButton icon="📊" text="Insights" onClick={() => setView(View.STATS)} />
-        </div>
+      <div className="w-full max-w-md space-y-4">
+        <MenuButton icon="🎲" text="Sugestão Aleatória" onClick={() => setView(View.RANDOM)} />
+        <MenuButton icon="💡" text="Sugestão Personalizada" onClick={() => setView(View.SUGGESTION)} />
+        <MenuButton icon="🤔" text="Será que vou gostar?" onClick={() => setView(View.PREDICT)} />
+        <MenuButton icon="⚔️" text="Duelo de Títulos" onClick={() => setView(View.DUEL)} />
+        {/* NOVO BOTÃO ADICIONADO AQUI */}
+        <MenuButton icon="📡" text="Radar de Lançamentos" onClick={() => setView(View.RADAR)} />
+        <MenuButton icon="📚" text="Minha Coleção" onClick={() => setView(View.COLLECTION)} />
+        <MenuButton icon="📋" text="Minha Lista para Ver" onClick={() => setView(View.WATCHLIST)} />
+        <MenuButton icon="📊" text="Ver Insights" onClick={() => setView(View.STATS)} />
       </div>
     </div>
   );
