@@ -147,7 +147,7 @@ const AddModal = ({ onClose }: { onClose: () => void }) => {
         const newQuery = e.target.value;
         setQuery(newQuery);
         setError('');
-        setSelectedSuggestion(null); // Limpa a seleção se o usuário voltar a digitar
+        setSelectedSuggestion(null);
         debouncedFetch(newQuery);
     };
     
@@ -239,8 +239,8 @@ const ItemCard = ({ item, onClick }: { item: ManagedWatchedItem, onClick: () => 
     return (
         <div onClick={onClick} className="relative bg-gray-800 rounded-lg group cursor-pointer overflow-hidden shadow-lg border-2 border-transparent hover:border-indigo-500 transition-all duration-300 aspect-[2/3]">
             {item.posterUrl ? <img src={item.posterUrl} alt={`Pôster de ${item.title}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full bg-gray-700 flex items-center justify-center text-center p-2"><span className="text-gray-500 text-sm">Pôster não disponível</span></div>}
-            <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent pointer-events-none"></div>
-            <div className="absolute bottom-0 left-0 right-0 p-3"><h3 className="font-bold text-white text-base truncate leading-tight drop-shadow-md" title={item.title} style={{textShadow: '1px 1px 2px rgba(0,0,0,0.7)'}}>{item.title}</h3></div>
+            <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/80 to-transparent pointer-events-none"></div>
+            <div className="absolute bottom-0 left-0 right-0 p-3"><h3 className="font-bold text-white text-base truncate leading-tight" style={{textShadow: '1px 1px 3px rgba(0,0,0,0.8)'}}>{item.title}</h3></div>
             <div className={`absolute top-2 right-2 text-xs font-bold py-1 px-2 rounded-full border backdrop-blur-sm ${ratingStyles[item.rating].bg} ${ratingStyles[item.rating].text} ${ratingStyles[item.rating].border}`}>{item.rating.toUpperCase()}</div>
         </div>
     );
@@ -259,14 +259,14 @@ const CollectionView: React.FC = () => {
     const availableGenres = useMemo(() => Array.from(new Set(allItems.map(item => item.genre))).sort(), [allItems]);
     const availableCategories = useMemo(() => Array.from(new Set(allItems.map(item => item.type))).sort(), [allItems]);
 
-    const [activeRatingFilter, setActiveRatingFilter] = useState<Set<Rating>>(new Set());
+    const [activeRatingFilter, setActiveRatingFilter] = useState<Rating | null>(null);
     const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
     const [selectedGenres, setSelectedGenres] = useState<Set<string>>(new Set());
 
     const sortedAndFilteredItems = useMemo(() => {
         let items = allItems;
         if (searchQuery) items = items.filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()));
-        if (activeRatingFilter.size > 0) items = items.filter(item => activeRatingFilter.has(item.rating));
+        if (activeRatingFilter) items = items.filter(item => item.rating === activeRatingFilter);
         if (selectedCategories.size > 0) items = items.filter(item => selectedCategories.has(item.type));
         if (selectedGenres.size > 0) items = items.filter(item => selectedGenres.has(item.genre));
 
@@ -294,18 +294,6 @@ const CollectionView: React.FC = () => {
         setSelectedItem(item);
         setModal('details');
     };
-
-    const handleRatingFilterClick = (rating: Rating) => {
-        setActiveRatingFilter(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(rating)) {
-                newSet.delete(rating);
-            } else {
-                newSet.add(rating);
-            }
-            return newSet;
-        });
-    };
     
     const handleCategoryChange = (category: string) => setSelectedCategories(prev => { const newSet = new Set(prev); newSet.has(category) ? newSet.delete(category) : newSet.add(category); return newSet; });
     const handleGenreChange = (genre: string) => setSelectedGenres(prev => { const newSet = new Set(prev); newSet.has(genre) ? newSet.delete(genre) : newSet.add(genre); return newSet; });
@@ -327,7 +315,7 @@ const CollectionView: React.FC = () => {
                     <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-gray-400 font-semibold">Avaliação:</span>
                         {ratingOptions.map(({ rating, emoji }) => (
-                            <button key={rating} onClick={() => handleRatingFilterClick(rating)} title={rating} className={`px-3 py-2 text-xl rounded-lg transition-all duration-300 ${activeRatingFilter.has(rating) ? 'bg-indigo-600 ring-2 ring-indigo-400 scale-110' : 'bg-gray-700 hover:bg-gray-600'}`}>{emoji}</button>
+                            <button key={rating} onClick={() => setActiveRatingFilter(prev => prev === rating ? null : rating)} title={rating} className={`px-3 py-2 text-xl rounded-lg transition-all duration-300 ${activeRatingFilter === rating ? 'bg-indigo-600 ring-2 ring-indigo-400 scale-110' : 'bg-gray-700 hover:bg-gray-600'}`}>{emoji}</button>
                         ))}
                     </div>
                     <div className="flex items-center gap-2">
@@ -349,7 +337,7 @@ const CollectionView: React.FC = () => {
                             <h4 className="font-semibold mb-2 text-gray-300">Categoria</h4>
                             <div className="space-y-2">{availableCategories.map(cat => (<label key={cat} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={selectedCategories.has(cat)} onChange={() => handleCategoryChange(cat)} className="h-4 w-4 rounded bg-gray-600 border-gray-500 text-indigo-500 focus:ring-indigo-600"/>{cat}</label>))}</div>
                         </div>
-                        <div className="md:col-span-2">
+                        <div className="md-col-span-2">
                             <h4 className="font-semibold mb-2 text-gray-300">Gênero</h4>
                             <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-600 p-3 rounded-md bg-gray-900/50">{availableGenres.map(genre => (<label key={genre} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={selectedGenres.has(genre)} onChange={() => handleGenreChange(genre)} className="h-4 w-4 rounded bg-gray-600 border-gray-500 text-indigo-500 focus:ring-indigo-600"/>{genre}</label>))}</div>
                         </div>
@@ -363,9 +351,9 @@ const CollectionView: React.FC = () => {
             ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {sortedAndFilteredItems.map(item => (
-                       <React.Fragment key={item.id}>
-                         <ItemCard item={item} onClick={() => handleItemClick(item)} />
-                       </React.Fragment>
+                       <div key={item.id}>
+                           <ItemCard item={item} onClick={() => handleItemClick(item)} />
+                       </div>
                     ))}
                 </div>
             )}
