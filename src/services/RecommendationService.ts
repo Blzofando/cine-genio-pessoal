@@ -137,7 +137,6 @@ ${formattedData}
 **Sua Tarefa:**
 Analise "${title}" e gere uma resposta completa no formato JSON, seguindo o schema, com probabilidades de gosto e uma análise detalhada.`;
     
-    // A chamada para a IA é a mesma, só muda o prompt
     const recommendation = await callGeminiWithSchema(prompt);
     const posterUrl = await fetchPosterUrl(recommendation.title);
     return { ...recommendation, posterUrl: posterUrl ?? undefined };
@@ -179,12 +178,29 @@ Qual é o ID correto? Responda APENAS com o número do ID.`;
     return mostPopular.id;
 };
 
+// ### FUNÇÃO CORRIGIDA E MELHORADA ###
 export const getFullMediaDetailsFromQuery = async (query: string): Promise<Omit<ManagedWatchedItem, 'rating' | 'createdAt'>> => {
-    const searchResults = await searchTMDb(query);
+    let searchResults: TMDbSearchResult[] = [];
+    
+    // Tentativa 1: Buscar com o query original
+    searchResults = await searchTMDb(query);
+
+    // Tentativa 2: Se a primeira falhar, simplificar o query e tentar de novo
+    if (searchResults.length === 0) {
+        const simplifiedQuery = query.replace(/\s*\([^)]*\)\s*/g, '').trim();
+        // Só busca de novo se a versão simplificada for diferente da original
+        if (simplifiedQuery && simplifiedQuery !== query) {
+            console.log(`Busca original falhou. Tentando com: "${simplifiedQuery}"`);
+            searchResults = await searchTMDb(simplifiedQuery);
+        }
+    }
+
+    // Se ainda não houver resultados, aí sim lançamos o erro
     if (!searchResults || searchResults.length === 0) {
         throw new Error(`Nenhum resultado encontrado para "${query}".`);
     }
 
+    // Se encontramos resultados, pedimos para a IA escolher o melhor
     const bestMatchId = await findBestTMDbMatch(query, searchResults);
     if (!bestMatchId) {
         throw new Error("A IA não conseguiu identificar um resultado correspondente.");
@@ -195,6 +211,7 @@ export const getFullMediaDetailsFromQuery = async (query: string): Promise<Omit<
         throw new Error("Ocorreu um erro interno ao selecionar o resultado.");
     }
 
+    // Com o melhor resultado em mãos, buscamos os detalhes completos
     const details = await getTMDbDetails(bestMatch.id, bestMatch.media_type);
 
     let mediaType: MediaType = 'Filme';
