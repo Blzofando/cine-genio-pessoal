@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect, useMemo, useCallback } from 'react';
-import { ManagedWatchedItem, Rating, TMDbSearchResult, WatchProvider } from '../types';
+import { ManagedWatchedItem, Rating, TMDbSearchResult, WatchProvider, MediaType } from '../types';
 import { WatchedDataContext } from '../App';
 import { getTMDbDetails, getProviders, searchTMDb } from '../services/TMDbService';
 import { updateWatchedItem } from '../services/firestoreService';
@@ -19,19 +19,28 @@ const ratingOptions: { rating: Rating; emoji: string; label: string }[] = [
     { rating: 'naoGostei', emoji: '👎', label: 'Não Gostei' },
 ];
 
-type SortType = 'createdAt' | 'title-asc' | 'title-desc' | 'release-asc' | 'release-desc';
+type SortType = 'createdAt-desc' | 'createdAt-asc' | 'title-asc' | 'title-desc';
 
-// --- Componentes do Modal ---
+// --- Componentes ---
 
-const Modal = ({ children, onClose }: { children: React.ReactNode, onClose: () => void }) => (
+interface ModalProps {
+    children: React.ReactNode;
+    onClose: () => void;
+}
+const Modal: React.FC<ModalProps> = ({ children, onClose }) => (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={onClose}>
-        <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up" onClick={e => e.stopPropagation()}>
             {children}
         </div>
     </div>
 );
 
-const WatchProvidersDisplay = ({ providers }: { providers: WatchProvider[] }) => (
+// --- Componentes do Modal de Detalhes ---
+
+interface WatchProvidersDisplayProps {
+    providers: WatchProvider[];
+}
+const WatchProvidersDisplay: React.FC<WatchProvidersDisplayProps> = ({ providers }) => (
     <div className="flex flex-wrap gap-3">
         {providers.map(p => (
             <img 
@@ -45,8 +54,13 @@ const WatchProvidersDisplay = ({ providers }: { providers: WatchProvider[] }) =>
     </div>
 );
 
-const DetailsModal = ({ item, onClose }: { item: ManagedWatchedItem, onClose: () => void }) => {
+interface DetailsModalProps {
+    item: ManagedWatchedItem;
+    onClose: () => void;
+}
+const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose }) => {
     const { removeItem } = useContext(WatchedDataContext);
+    // ... (O restante do código do DetailsModal permanece o mesmo)
     const [currentItem, setCurrentItem] = useState(item);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -110,8 +124,14 @@ const DetailsModal = ({ item, onClose }: { item: ManagedWatchedItem, onClose: ()
     );
 };
 
-// --- AddModal com Preview ---
-const AddModal = ({ onClose }: { onClose: () => void }) => {
+
+// --- Componente do Modal de Adicionar ---
+
+interface AddModalProps {
+    onClose: () => void;
+}
+const AddModal: React.FC<AddModalProps> = ({ onClose }) => {
+    // ... (O código do AddModal permanece o mesmo)
     const [query, setQuery] = useState('');
     const [rating, setRating] = useState<Rating>('gostei');
     const [suggestions, setSuggestions] = useState<TMDbSearchResult[]>([]);
@@ -233,14 +253,135 @@ const AddModal = ({ onClose }: { onClose: () => void }) => {
     );
 };
 
-// --- Componentes da Coleção ---
 
-const ItemCard = ({ item, onClick }: { item: ManagedWatchedItem, onClick: () => void }) => {
+// --- NOVO Componente do Modal de Filtros ---
+
+interface GenreSelectorProps {
+    availableGenres: string[];
+    selectedGenres: Set<string>;
+    onToggle: (genre: string) => void;
+}
+const GenreSelector: React.FC<GenreSelectorProps> = ({ availableGenres, selectedGenres, onToggle }) => {
+    const [query, setQuery] = useState('');
+    const filteredGenres = query ? availableGenres.filter(g => g.toLowerCase().includes(query.toLowerCase())) : availableGenres;
+
+    return (
+        <div>
+            <h3 className="font-semibold text-gray-300 mb-3">Gênero</h3>
+            <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar gênero..."
+                className="w-full bg-gray-900 text-white p-2 mb-2 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <div className="max-h-40 overflow-y-auto space-y-1 p-1">
+                {filteredGenres.map(genre => (
+                    <button
+                        key={genre}
+                        onClick={() => onToggle(genre)}
+                        className={`w-full text-left px-3 py-1.5 text-sm rounded-lg transition-colors ${selectedGenres.has(genre) ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}
+                    >
+                        {genre}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+interface FilterModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    availableCategories: string[];
+    availableGenres: string[];
+    
+    tempSortType: SortType;
+    setTempSortType: (sort: SortType) => void;
+    tempSelectedCategories: Set<string>;
+    setTempSelectedCategories: (cats: Set<string>) => void;
+    tempSelectedGenres: Set<string>;
+    setTempSelectedGenres: (genres: Set<string>) => void;
+
+    onApply: () => void;
+}
+const FilterModal: React.FC<FilterModalProps> = ({ 
+    isOpen, onClose, availableCategories, availableGenres,
+    tempSortType, setTempSortType,
+    tempSelectedCategories, setTempSelectedCategories,
+    tempSelectedGenres, setTempSelectedGenres,
+    onApply 
+}) => {
+    if (!isOpen) return null;
+
+    const handleCategoryToggle = (cat: string) => {
+        const newSet = new Set(tempSelectedCategories);
+        if (newSet.has(cat)) newSet.delete(cat);
+        else newSet.add(cat);
+        setTempSelectedCategories(newSet);
+    };
+
+    const handleGenreToggle = (genre: string) => {
+        const newSet = new Set(tempSelectedGenres);
+        if (newSet.has(genre)) newSet.delete(genre);
+        else newSet.add(genre);
+        setTempSelectedGenres(newSet);
+    };
+
+    const sortOptions: {id: SortType, label: string}[] = [
+        {id: 'createdAt-desc', label: 'Mais Recentes'},
+        {id: 'createdAt-asc', label: 'Mais Antigos'},
+        {id: 'title-asc', label: 'Título (A-Z)'},
+        {id: 'title-desc', label: 'Título (Z-A)'}
+    ];
+
+    return (
+        <Modal onClose={onClose}>
+            <div className="p-6">
+                <h2 className="text-2xl font-bold text-white mb-6">Filtros e Ordenação</h2>
+                <div className="space-y-6">
+                    <div>
+                        <h3 className="font-semibold text-gray-300 mb-3">Ordenar por</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {sortOptions.map(opt => (
+                                <button key={opt.id} onClick={() => setTempSortType(opt.id)} className={`px-3 py-2 text-sm rounded-lg transition-colors ${tempSortType === opt.id ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>{opt.label}</button>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-gray-300 mb-3">Categoria</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {availableCategories.map((cat: string) => (
+                                <button key={cat} onClick={() => handleCategoryToggle(cat)} className={`px-3 py-2 text-sm rounded-lg transition-colors ${tempSelectedCategories.has(cat) ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>{cat}</button>
+                            ))}
+                        </div>
+                    </div>
+                    <GenreSelector availableGenres={availableGenres} selectedGenres={tempSelectedGenres} onToggle={handleGenreToggle} />
+                </div>
+                <div className="mt-8 pt-4 border-t border-gray-700 flex justify-end">
+                    <button onClick={onApply} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg">Aplicar</button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
+
+// --- Componente Principal da Coleção ---
+
+interface ItemCardProps {
+    item: ManagedWatchedItem;
+    onClick: () => void;
+}
+const ItemCard: React.FC<ItemCardProps> = ({ item, onClick }) => {
     return (
         <div onClick={onClick} className="relative bg-gray-800 rounded-lg group cursor-pointer overflow-hidden shadow-lg border-2 border-transparent hover:border-indigo-500 transition-all duration-300 aspect-[2/3]">
             {item.posterUrl ? <img src={item.posterUrl} alt={`Pôster de ${item.title}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" /> : <div className="w-full h-full bg-gray-700 flex items-center justify-center text-center p-2"><span className="text-gray-500 text-sm">Pôster não disponível</span></div>}
+            {/* Gradiente para legibilidade do texto */}
             <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/80 to-transparent pointer-events-none"></div>
-            <div className="absolute bottom-0 left-0 right-0 p-3"><h3 className="font-bold text-white text-base truncate leading-tight" style={{textShadow: '1px 1px 3px rgba(0,0,0,0.8)'}}>{item.title}</h3></div>
+            <div className="absolute bottom-0 left-0 right-0 p-3">
+                <h3 className="font-bold text-white text-base truncate leading-tight" title={item.title}>{item.title}</h3>
+            </div>
             <div className={`absolute top-2 right-2 text-xs font-bold py-1 px-2 rounded-full border backdrop-blur-sm ${ratingStyles[item.rating].bg} ${ratingStyles[item.rating].text} ${ratingStyles[item.rating].border}`}>{item.rating.toUpperCase()}</div>
         </div>
     );
@@ -249,100 +390,102 @@ const ItemCard = ({ item, onClick }: { item: ManagedWatchedItem, onClick: () => 
 const CollectionView: React.FC = () => {
     const { data } = useContext(WatchedDataContext);
     const [modal, setModal] = useState<'add' | 'details' | null>(null);
+    const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<ManagedWatchedItem | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [sortType, setSortType] = useState<SortType>('createdAt');
-    const [advancedFiltersVisible, setAdvancedFiltersVisible] = useState(false);
     
     const allItems: ManagedWatchedItem[] = useMemo(() => [...data.amei, ...data.gostei, ...data.meh, ...data.naoGostei], [data]);
     
     const availableGenres = useMemo(() => Array.from(new Set(allItems.map(item => item.genre))).sort(), [allItems]);
     const availableCategories = useMemo(() => Array.from(new Set(allItems.map(item => item.type))).sort(), [allItems]);
 
+    // Estados dos filtros APLICADOS
     const [activeRatingFilter, setActiveRatingFilter] = useState<Rating | null>(null);
-    const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
-    const [selectedGenres, setSelectedGenres] = useState<Set<string>>(new Set());
+    const [appliedSortType, setAppliedSortType] = useState<SortType>('createdAt-desc');
+    const [appliedCategories, setAppliedCategories] = useState<Set<string>>(new Set());
+    const [appliedGenres, setAppliedGenres] = useState<Set<string>>(new Set());
+
+    // Estados TEMPORÁRIOS para o modal
+    const [tempSortType, setTempSortType] = useState<SortType>(appliedSortType);
+    const [tempSelectedCategories, setTempSelectedCategories] = useState<Set<string>>(appliedCategories);
+    const [tempSelectedGenres, setTempSelectedGenres] = useState<Set<string>>(appliedGenres);
 
     const sortedAndFilteredItems = useMemo(() => {
         let items = allItems;
         if (searchQuery) items = items.filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()));
         if (activeRatingFilter) items = items.filter(item => item.rating === activeRatingFilter);
-        if (selectedCategories.size > 0) items = items.filter(item => selectedCategories.has(item.type));
-        if (selectedGenres.size > 0) items = items.filter(item => selectedGenres.has(item.genre));
+        if (appliedCategories.size > 0) items = items.filter(item => appliedCategories.has(item.type));
+        if (appliedGenres.size > 0) items = items.filter(item => appliedGenres.has(item.genre));
 
         return items.sort((a, b) => {
-            switch (sortType) {
+            switch (appliedSortType) {
                 case 'title-asc': return a.title.localeCompare(b.title);
                 case 'title-desc': return b.title.localeCompare(a.title);
-                case 'release-asc': {
-                    const yearA = a.title.match(/\((\d{4})\)/)?.[1] || '0';
-                    const yearB = b.title.match(/\((\d{4})\)/)?.[1] || '0';
-                    return parseInt(yearA) - parseInt(yearB);
-                }
-                case 'release-desc': {
-                    const yearA = a.title.match(/\((\d{4})\)/)?.[1] || '0';
-                    const yearB = b.title.match(/\((\d{4})\)/)?.[1] || '0';
-                    return parseInt(yearB) - parseInt(yearA);
-                }
-                case 'createdAt':
+                case 'createdAt-asc': return a.createdAt - b.createdAt;
+                case 'createdAt-desc':
                 default: return b.createdAt - a.createdAt;
             }
         });
-    }, [allItems, activeRatingFilter, selectedCategories, selectedGenres, searchQuery, sortType]);
+    }, [allItems, activeRatingFilter, appliedCategories, appliedGenres, searchQuery, appliedSortType]);
 
     const handleItemClick = (item: ManagedWatchedItem) => {
         setSelectedItem(item);
         setModal('details');
     };
     
-    const handleCategoryChange = (category: string) => setSelectedCategories(prev => { const newSet = new Set(prev); newSet.has(category) ? newSet.delete(category) : newSet.add(category); return newSet; });
-    const handleGenreChange = (genre: string) => setSelectedGenres(prev => { const newSet = new Set(prev); newSet.has(genre) ? newSet.delete(genre) : newSet.add(genre); return newSet; });
-    const clearAdvancedFilters = () => { setSelectedCategories(new Set()); setSelectedGenres(new Set()); };
+    const openFilterModal = () => {
+        // Inicializa os filtros temporários com os valores já aplicados
+        setTempSortType(appliedSortType);
+        setTempSelectedCategories(new Set(appliedCategories));
+        setTempSelectedGenres(new Set(appliedGenres));
+        setIsFilterModalOpen(true);
+    };
+
+    const applyFilters = () => {
+        // Aplica os filtros temporários aos filtros reais
+        setAppliedSortType(tempSortType);
+        setAppliedCategories(tempSelectedCategories);
+        setAppliedGenres(tempSelectedGenres);
+        setIsFilterModalOpen(false);
+    };
 
     return (
         <div className="p-4">
             {modal === 'details' && selectedItem && <DetailsModal item={selectedItem} onClose={() => setModal(null)} />}
             {modal === 'add' && <AddModal onClose={() => setModal(null)} />}
             
+            <FilterModal
+                isOpen={isFilterModalOpen}
+                onClose={() => setIsFilterModalOpen(false)}
+                availableCategories={availableCategories}
+                availableGenres={availableGenres}
+                tempSortType={tempSortType}
+                setTempSortType={setTempSortType}
+                tempSelectedCategories={tempSelectedCategories}
+                setTempSelectedCategories={setTempSelectedCategories}
+                tempSelectedGenres={tempSelectedGenres}
+                setTempSelectedGenres={setTempSelectedGenres}
+                onApply={applyFilters}
+            />
+            
             <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
                 <h1 className="text-4xl font-bold text-white mb-4 sm:mb-0">Minha Coleção</h1>
                 <button onClick={() => setModal('add')} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 shadow-lg transition-transform transform hover:scale-105">[+] Adicionar</button>
             </div>
 
+            {/* BARRA DE FILTROS REDESENHADA */}
             <div className="bg-gray-800 p-4 rounded-lg mb-8 space-y-4">
                 <input type="text" placeholder="Buscar na coleção..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-gray-700 text-white p-3 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                 <div className="flex flex-col sm:flex-row gap-4 justify-between">
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-gray-400 font-semibold">Avaliação:</span>
                         {ratingOptions.map(({ rating, emoji }) => (
                             <button key={rating} onClick={() => setActiveRatingFilter(prev => prev === rating ? null : rating)} title={rating} className={`px-3 py-2 text-xl rounded-lg transition-all duration-300 ${activeRatingFilter === rating ? 'bg-indigo-600 ring-2 ring-indigo-400 scale-110' : 'bg-gray-700 hover:bg-gray-600'}`}>{emoji}</button>
                         ))}
                     </div>
-                    <div className="flex items-center gap-2">
-                         <button onClick={() => setAdvancedFiltersVisible(!advancedFiltersVisible)} className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2">
-                             Filtros {advancedFiltersVisible ? '▴' : '▾'}
-                         </button>
-                        <select value={sortType} onChange={e => setSortType(e.target.value as SortType)} className="bg-gray-700 text-white p-2 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none pr-8 bg-no-repeat bg-right" style={{backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`}}>
-                            <option value="createdAt">Mais Recentes</option>
-                            <option value="title-asc">Título (A-Z)</option>
-                            <option value="title-desc">Título (Z-A)</option>
-                            <option value="release-desc">Ano (Novo-Antigo)</option>
-                            <option value="release-asc">Ano (Antigo-Novo)</option>
-                        </select>
-                    </div>
-                </div>
-                <div className={`transition-all duration-500 ease-in-out overflow-hidden ${advancedFiltersVisible ? 'max-h-96 pt-4 border-t border-gray-700' : 'max-h-0'}`}>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <h4 className="font-semibold mb-2 text-gray-300">Categoria</h4>
-                            <div className="space-y-2">{availableCategories.map(cat => (<label key={cat} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={selectedCategories.has(cat)} onChange={() => handleCategoryChange(cat)} className="h-4 w-4 rounded bg-gray-600 border-gray-500 text-indigo-500 focus:ring-indigo-600"/>{cat}</label>))}</div>
-                        </div>
-                        <div className="md-col-span-2">
-                            <h4 className="font-semibold mb-2 text-gray-300">Gênero</h4>
-                            <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-600 p-3 rounded-md bg-gray-900/50">{availableGenres.map(genre => (<label key={genre} className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={selectedGenres.has(genre)} onChange={() => handleGenreChange(genre)} className="h-4 w-4 rounded bg-gray-600 border-gray-500 text-indigo-500 focus:ring-indigo-600"/>{genre}</label>))}</div>
-                        </div>
-                    </div>
-                     <button onClick={clearAdvancedFilters} className="text-sm text-indigo-400 hover:text-indigo-300 mt-4">Limpar Filtros</button>
+                    <button onClick={openFilterModal} className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center sm:justify-start gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 12.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-4.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" /></svg>
+                         Filtros & Ordenação
+                    </button>
                 </div>
             </div>
 
@@ -351,9 +494,7 @@ const CollectionView: React.FC = () => {
             ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {sortedAndFilteredItems.map(item => (
-                       <div key={item.id}>
-                           <ItemCard item={item} onClick={() => handleItemClick(item)} />
-                       </div>
+                       <ItemCard key={item.id} item={item} onClick={() => handleItemClick(item)} />
                     ))}
                 </div>
             )}
