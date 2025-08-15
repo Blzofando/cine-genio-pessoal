@@ -4,7 +4,7 @@ import { DuelResult, TMDbSearchResult } from '../types';
 import { getDuelAnalysis } from '../services/RecommendationService';
 import { searchTMDb } from '../services/TMDbService';
 
-// --- Componente de Seleção de Título (Inalterado) ---
+// --- Componente de Seleção de Título com Autocomplete ---
 interface TitleSelectorProps {
     label: string;
     onTitleSelect: (title: TMDbSearchResult | null) => void;
@@ -101,10 +101,29 @@ const BattleAnimation: React.FC<BattleAnimationProps> = ({ poster1, poster2 }) =
     return (
         <div className="mt-10 w-full max-w-xl flex flex-col items-center justify-center animate-fade-in">
             <div className="relative w-full h-48 flex justify-center items-center">
-                <img src={poster1 || 'https://placehold.co/150x225/374151/9ca3af?text=?'} alt="Pôster 1" className="w-28 h-42 object-cover rounded-md shadow-lg absolute left-0 animate-duel-left"/>
-                <div className={`text-5xl font-black text-gray-500 transition-opacity duration-500 ${showDust ? 'opacity-0' : 'opacity-100'}`}>VS</div>
-                <img src={poster2 || 'https://placehold.co/150x225/374151/9ca3af?text=?'} alt="Pôster 2" className="w-28 h-42 object-cover rounded-md shadow-lg absolute right-0 animate-duel-right"/>
-                {showDust && <div className="absolute text-7xl opacity-0 animate-poeira">💥</div>}
+                <img 
+                    src={poster1 || 'https://placehold.co/150x225/374151/9ca3af?text=?'} 
+                    alt="Pôster 1" 
+                    className="w-28 h-42 object-cover rounded-md shadow-lg absolute left-0 animate-duel-left"
+                />
+                
+                {!showDust && (
+                    <div className="text-5xl font-black text-gray-500 transition-opacity duration-300">
+                        VS
+                    </div>
+                )}
+
+                <img 
+                    src={poster2 || 'https://placehold.co/150x225/374151/9ca3af?text=?'} 
+                    alt="Pôster 2" 
+                    className="w-28 h-42 object-cover rounded-md shadow-lg absolute right-0 animate-duel-right"
+                />
+
+                {showDust && (
+                    <div className="absolute text-7xl opacity-0 animate-poeira">
+                        💥
+                    </div>
+                )}
             </div>
             <h2 className="text-xl font-bold text-gray-400 mt-4 animate-pulse">Duelo em análise...</h2>
         </div>
@@ -112,7 +131,7 @@ const BattleAnimation: React.FC<BattleAnimationProps> = ({ poster1, poster2 }) =
 };
 
 
-// --- Componente de Exibição do Vencedor (Inalterado) ---
+// --- Componente de Exibição do Vencedor ---
 interface WinnerDisplayProps {
     result: DuelResult;
     onReset: () => void;
@@ -155,7 +174,6 @@ const DuelView: React.FC = () => {
         setError(null);
         setResult(null);
         try {
-            // A chamada à IA acontece aqui
             const duelResult = await getDuelAnalysis(title1.title || title1.name || '', title2.title || title2.name || '', watchedData);
             setResult(duelResult);
         } catch (err) {
