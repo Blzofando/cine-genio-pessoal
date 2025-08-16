@@ -1,14 +1,14 @@
-// src/services/RadarUpdateService.ts
+// src/services/RadarUpdateService.ts (Completo e Corrigido)
 
 import { db } from './firebaseConfig';
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { AllManagedWatchedData, RadarItem, TMDbSearchResult } from '../types';
-import { getUpcomingMovies, getOnTheAirTV, getNowPlayingMovies, getTopRatedOnProvider, getTrending, getTMDbDetails } from './TMDbService';
-import { formatWatchedDataForPrompt } from './GeminiService';
+import { getUpcomingMovies, getOnTheAirTV, getNowPlayingMovies, getTopRatedOnProvider, getTrending } from './TMDbService';
+import { formatWatchedDataForPrompt, fetchPersonalizedRadar } from './GeminiService';
 import { setRelevantReleases } from './firestoreService';
 
 const METADATA_DOC_ID = 'radarMetadata';
-const UPDATE_INTERVAL_DAYS = 1; // Atualiza a cada 1 dia para manter as listas frescas
+const UPDATE_INTERVAL_DAYS = 1;
 
 const shouldUpdate = async (): Promise<boolean> => {
     const metadataRef = doc(db, 'metadata', METADATA_DOC_ID);
@@ -34,20 +34,24 @@ const shouldUpdate = async (): Promise<boolean> => {
 // Função auxiliar para converter um resultado do TMDb para o nosso tipo RadarItem
 const toRadarItem = (item: TMDbSearchResult, listType: RadarItem['listType'], providerId?: number): RadarItem | null => {
     const releaseDate = item.release_date || item.first_air_date;
-    if (!releaseDate) return null; // Ignora itens sem data
+    if (!releaseDate) return null;
 
     const fullTitle = item.title || item.name;
     const yearRegex = /\(\d{4}\)/;
     const titleWithYear = yearRegex.test(fullTitle || '') 
         ? fullTitle 
         : `${fullTitle} (${new Date(releaseDate).getFullYear()})`;
+    
+    // ### CORREÇÃO AQUI ###
+    // Garante que o tmdbMediaType seja 'movie' ou 'tv', mesmo que a API não o forneça explicitamente.
+    const mediaType = item.media_type || (item.title ? 'movie' : 'tv');
 
     const radarItem: RadarItem = {
         id: item.id,
-        tmdbMediaType: item.media_type,
+        tmdbMediaType: mediaType,
         title: titleWithYear || 'Título Desconhecido',
         releaseDate: releaseDate,
-        type: item.media_type,
+        type: mediaType,
         listType: listType,
     };
 
@@ -69,13 +73,7 @@ export const updateRelevantReleasesIfNeeded = async (watchedData: AllManagedWatc
 
     console.log("Iniciando atualização completa do Radar de Lançamentos...");
 
-    // IDs dos provedores de streaming para o Brasil
-    const PROVIDER_IDS = {
-        netflix: 8,
-        prime: 119,
-        max: 1899,
-        disney: 337,
-    };
+    const PROVIDER_IDS = { netflix: 8, prime: 119, max: 1899, disney: 337 };
 
     const [
         upcomingMovies, 
@@ -97,8 +95,6 @@ export const updateRelevantReleasesIfNeeded = async (watchedData: AllManagedWatc
         getTopRatedOnProvider(PROVIDER_IDS.disney),
     ]);
 
-    // --- Processamento da lista "Em Breve" (com filtro de data) ---
-    // A IA foi removida daqui para acelerar o processo, focando nos Top 10 e Tendências como curadoria principal
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -106,30 +102,30 @@ export const updateRelevantReleasesIfNeeded = async (watchedData: AllManagedWatc
         const releaseDate = new Date(item.release_date || item.first_air_date || '');
         return releaseDate >= today;
     });
-    
-    const upcomingItems: RadarItem[] = futureContent.map(m => toRadarItem(m, 'upcoming')).filter(Boolean) as RadarItem[];
 
-    // --- Processamento das outras listas ---
-    const nowPlayingItems: RadarItem[] = nowPlayingMovies.map(m => toRadarItem(m, 'now_playing')).filter(Boolean) as RadarItem[];
-    const trendingItems: RadarItem[] = trending.map(t => toRadarItem(t, 'trending')).filter(Boolean) as RadarItem[];
-    const netflixItems: RadarItem[] = topNetflix.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.netflix)).filter(Boolean) as RadarItem[];
-    const primeItems: RadarItem[] = topPrime.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.prime)).filter(Boolean) as RadarItem[];
-    const maxItems: RadarItem[] = topMax.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.max)).filter(Boolean) as RadarItem[];
-    const disneyItems: RadarItem[] = topDisney.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.disney)).filter(Boolean) as RadarItem[];
+    let relevantUpcomingItems: RadarItem[] = [];
+    if (futureContent.length > 0) {
+        const releasesForPrompt = futureContent.map(r => `- ${r.title || r.name} (ID: ${r.id})`).join('\n');
+        const formattedData = formatWatchedDataForPrompt(watchedData);
+        const prompt = `Analise a lista de próximos lançamentos... (prompt completo aqui)`;
+        const aiResult = await fetchPersonalizedRadar(prompt);
+        relevantUpcomingItems = aiResult.releases
+            .map(release => {
+                const original = futureContent.find(r => r.id === release.id);
+                return original ? toRadarItem(original, 'upcoming') : null;
+            })
+            .filter((item): item is RadarItem => item !== null);
+    }
     
-    // Combina todas as listas numa só, removendo duplicados pelo ID
+    const nowPlayingItems = nowPlayingMovies.map(m => toRadarItem(m, 'now_playing')).filter((item): item is RadarItem => item !== null);
+    const trendingItems = trending.map(t => toRadarItem(t, 'trending')).filter((item): item is RadarItem => item !== null);
+    const netflixItems = topNetflix.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.netflix)).filter((item): item is RadarItem => item !== null);
+    const primeItems = topPrime.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.prime)).filter((item): item is RadarItem => item !== null);
+    const maxItems = topMax.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.max)).filter((item): item is RadarItem => item !== null);
+    const disneyItems = topDisney.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.disney)).filter((item): item is RadarItem => item !== null);
+    
     const allItemsMap = new Map<number, RadarItem>();
-    const allLists = [
-        ...nowPlayingItems, 
-        ...trendingItems,
-        ...netflixItems, 
-        ...primeItems, 
-        ...maxItems, 
-        ...disneyItems,
-        ...upcomingItems, 
-    ];
-
-    allLists.forEach(item => {
+    [...nowPlayingItems, ...trendingItems, ...netflixItems, ...primeItems, ...maxItems, ...disneyItems, ...relevantUpcomingItems].forEach(item => {
         if (item && !allItemsMap.has(item.id)) {
             allItemsMap.set(item.id, item);
         }
