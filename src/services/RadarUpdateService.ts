@@ -1,14 +1,13 @@
-// src/services/RadarUpdateService.ts
+// src/services/RadarUpdateService.ts (Completo e Atualizado)
 
 import { db } from './firebaseConfig';
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { AllManagedWatchedData, RadarItem } from '../types';
-import { getUpcomingMovies, getOnTheAirTV } from './TMDbService';
-import { fetchPersonalizedRadar, formatWatchedDataForPrompt } from './GeminiService';
+import { getUpcomingMovies, getOnTheAirTV, getNowPlayingMovies, getTopRatedOnProvider } from './TMDbService';
 import { setRelevantReleases } from './firestoreService';
 
 const METADATA_DOC_ID = 'radarMetadata';
-const UPDATE_INTERVAL_DAYS = 7;
+const UPDATE_INTERVAL_DAYS = 7; // Atualiza a cada 1 dia para manter as listas de Top 10 frescas
 
 const shouldUpdate = async (): Promise<boolean> => {
     const metadataRef = doc(db, 'metadata', METADATA_DOC_ID);
@@ -32,62 +31,43 @@ const shouldUpdate = async (): Promise<boolean> => {
 };
 
 export const updateRelevantReleasesIfNeeded = async (watchedData: AllManagedWatchedData): Promise<void> => {
-    const needsUpdate = await shouldUpdate();
-    if (!needsUpdate) {
+    if (!(await shouldUpdate())) {
+        console.log("Atualização do Radar não é necessária. A usar dados em cache.");
         return;
     }
 
     console.log("Iniciando atualização do Radar de Lançamentos...");
 
-    const [movies, tvShows] = await Promise.all([getUpcomingMovies(), getOnTheAirTV()]);
+    // Busca todas as fontes de dados em paralelo
+    const [
+        upcomingMovies, 
+        onTheAirShows, 
+        nowPlayingMovies, 
+        topNetflix
+    ] = await Promise.all([
+        getUpcomingMovies(),
+        getOnTheAirTV(),
+        getNowPlayingMovies(),
+        getTopRatedOnProvider(8) // ID da Netflix no Brasil
+    ]);
 
-    const allReleases = [
-        ...movies.map(m => ({ ...m, media_type: 'movie' as const })),
-        ...tvShows.map(t => ({ ...t, media_type: 'tv' as const }))
-    ];
+    // Converte cada lista para o formato RadarItem com o seu listType
+    const upcomingItems: RadarItem[] = upcomingMovies.map(m => ({ id: m.id, tmdbMediaType: 'movie', title: m.title || '', posterUrl: m.poster_path ? `https://image.tmdb.org/t/p/w500${m.poster_path}` : undefined, releaseDate: m.release_date || '', type: 'movie', listType: 'upcoming' }));
+    const onAirItems: RadarItem[] = onTheAirShows.map(s => ({ id: s.id, tmdbMediaType: 'tv', title: s.name || '', posterUrl: s.poster_path ? `https://image.tmdb.org/t/p/w500${s.poster_path}` : undefined, releaseDate: s.first_air_date || '', type: 'tv', listType: 'upcoming' }));
+    const nowPlayingItems: RadarItem[] = nowPlayingMovies.map(m => ({ id: m.id, tmdbMediaType: 'movie', title: m.title || '', posterUrl: m.poster_path ? `https://image.tmdb.org/t/p/w500${m.poster_path}` : undefined, releaseDate: m.release_date || '', type: 'movie', listType: 'now_playing' }));
+    const netflixItems: RadarItem[] = topNetflix.map(m => ({ id: m.id, tmdbMediaType: 'movie', title: m.title || '', posterUrl: m.poster_path ? `https://image.tmdb.org/t/p/w500${m.poster_path}` : undefined, releaseDate: m.release_date || '', type: 'movie', listType: 'top_rated_provider' }));
 
-    const releasesForPrompt = allReleases.map(r => `- ${r.title || r.name} (ID: ${r.id}, Tipo: ${r.media_type})`).join('\n');
-    
-    const formattedData = formatWatchedDataForPrompt(watchedData);
-    const prompt = `Analise a lista de próximos lançamentos e séries no ar e selecione até 20 que sejam mais relevantes para o usuário, com base no seu perfil de gosto.
-
-**PERFIL DO USUÁRIO:**
-${formattedData}
-
-**LISTA DE LANÇAMENTOS:**
-${releasesForPrompt}
-
-**Sua Tarefa:**
-Retorne um objeto JSON contendo uma chave "releases", que é um array com os 20 lançamentos mais promissores. Para cada item, inclua 'id', 'tmdbMediaType' e 'title'.`;
-
-    const result = await fetchPersonalizedRadar(prompt);
-    
-    // ### CORREÇÃO AQUI ###
-    // A lógica para criar os itens foi ajustada para evitar o 'undefined' no posterUrl
-    const enrichedReleases: RadarItem[] = result.releases.map(release => {
-        const originalRelease = allReleases.find(r => r.id === release.id);
-        if (!originalRelease) return null;
-
-        const radarItem: RadarItem = {
-            id: release.id,
-            tmdbMediaType: release.tmdbMediaType,
-            title: originalRelease.title || originalRelease.name || 'Título Desconhecido',
-            releaseDate: originalRelease.release_date || originalRelease.first_air_date || 'Em breve',
-            type: originalRelease.media_type,
-        };
-
-        // Adiciona o posterUrl apenas se ele existir
-        if (originalRelease.poster_path) {
-            radarItem.posterUrl = `https://image.tmdb.org/t/p/w500${originalRelease.poster_path}`;
+    // Combina todas as listas numa só, removendo duplicados pelo ID
+    const allItemsMap = new Map<number, RadarItem>();
+    [...nowPlayingItems, ...netflixItems, ...upcomingItems, ...onAirItems].forEach(item => {
+        if (!allItemsMap.has(item.id)) {
+            allItemsMap.set(item.id, item);
         }
+    });
+    const allItems = Array.from(allItemsMap.values());
 
-        return radarItem;
-    }).filter(Boolean) as RadarItem[];
+    await setRelevantReleases(allItems);
+    await setDoc(doc(db, 'metadata', METADATA_DOC_ID), { lastUpdate: new Date() });
 
-    await setRelevantReleases(enrichedReleases);
-
-    const metadataRef = doc(db, 'metadata', METADATA_DOC_ID);
-    await setDoc(metadataRef, { lastUpdate: new Date() });
-
-    console.log("Atualização do Radar de Lançamentos concluída!");
+    console.log(`Atualização do Radar de Lançamentos concluída! ${allItems.length} itens salvos.`);
 };

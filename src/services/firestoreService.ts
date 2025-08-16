@@ -1,11 +1,12 @@
-// src/services/firestoreService.ts
+// src/services/firestoreService.ts (Completo e Simplificado)
 
 import { db } from './firebaseConfig';
 import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc, writeBatch } from "firebase/firestore";
-import { ManagedWatchedItem, Rating, WatchlistItem, RadarItem, CalendarItem, Challenge } from '../types';
+import { ManagedWatchedItem, Rating, WatchlistItem, RadarItem, Challenge } from '../types';
 
 // --- COLEÇÃO PRINCIPAL (ASSISTIDOS) ---
 const WATCHED_COLLECTION_NAME = 'watchedItems';
+
 export const getWatchedItems = async (): Promise<ManagedWatchedItem[]> => {
     const querySnapshot = await getDocs(collection(db, WATCHED_COLLECTION_NAME));
     const items: ManagedWatchedItem[] = [];
@@ -50,9 +51,8 @@ export const updateWatchlistItem = async (id: number, dataToUpdate: Partial<Watc
 };
 
 
-// --- FUNÇÕES PARA O RADAR DE LANÇAMENTOS ---
+// --- RADAR DE LANÇAMENTOS RELEVANTES ---
 const RELEASES_COLLECTION_NAME = 'relevantReleases';
-const CALENDAR_COLLECTION_NAME = 'myCalendar';
 
 export const getRelevantReleases = async (): Promise<RadarItem[]> => {
     const querySnapshot = await getDocs(collection(db, RELEASES_COLLECTION_NAME));
@@ -68,30 +68,17 @@ export const setRelevantReleases = async (releases: RadarItem[]): Promise<void> 
     oldDocsSnapshot.forEach(document => { batch.delete(document.ref); });
     releases.forEach(release => {
         const newDocRef = doc(collectionRef, release.id.toString());
+        // Garante que não há campos undefined
+        Object.keys(release).forEach(key => (release as any)[key] === undefined && delete (release as any)[key]);
         batch.set(newDocRef, release);
     });
     await batch.commit();
 };
 
-export const getMyCalendar = async (): Promise<CalendarItem[]> => {
-    const querySnapshot = await getDocs(collection(db, CALENDAR_COLLECTION_NAME));
-    const items: CalendarItem[] = [];
-    querySnapshot.forEach((doc) => { items.push(doc.data() as CalendarItem); });
-    return items;
-};
 
-export const addToMyCalendar = async (itemData: CalendarItem): Promise<void> => {
-    const itemDocRef = doc(db, CALENDAR_COLLECTION_NAME, itemData.id.toString());
-    await setDoc(itemDocRef, itemData);
-};
-
-export const removeFromMyCalendar = async (id: number): Promise<void> => {
-    const itemDocRef = doc(db, CALENDAR_COLLECTION_NAME, id.toString());
-    await deleteDoc(itemDocRef);
-};
-
-// --- FUNÇÕES PARA OS DESAFIOS ---
+// --- COLEÇÃO DOS DESAFIOS ---
 const CHALLENGES_COLLECTION_NAME = 'challenges';
+
 export const getChallengesHistory = async (): Promise<Challenge[]> => {
     const querySnapshot = await getDocs(collection(db, CHALLENGES_COLLECTION_NAME));
     const items: Challenge[] = [];

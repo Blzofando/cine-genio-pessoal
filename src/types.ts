@@ -1,4 +1,4 @@
-// src/types.ts (Completo e Corrigido)
+// src/types.ts (Completo e Atualizado)
 
 export type MediaType = 'Filme' | 'Série' | 'Anime' | 'Programa';
 export type Rating = 'amei' | 'gostei' | 'meh' | 'naoGostei';
@@ -58,26 +58,15 @@ export interface Challenge {
     steps?: ChallengeStep[];
 }
 
-// DEFINIÇÕES QUE FALTAVAM, AGORA CORRIGIDAS
 export interface RadarItem {
-    id: number; // TMDB ID
+    id: number;
     tmdbMediaType: 'movie' | 'tv';
     title: string;
     posterUrl?: string;
-    releaseDate: string; // Data de lançamento (ex: "2025-12-25")
+    releaseDate: string;
     type: 'movie' | 'tv';
-    status?: string;
-    nextEpisodeToAir?: {
-        air_date: string;
-        episode_number: number;
-        season_number: number;
-    };
+    listType: 'upcoming' | 'now_playing' | 'top_rated_provider'; 
 }
-
-export interface CalendarItem extends RadarItem {
-    addedAt: number;
-}
-
 
 export type AllManagedWatchedData = {
   [key in Rating]: ManagedWatchedItem[];
@@ -114,15 +103,6 @@ export interface DuelResult {
         probability: number;
     };
     verdict: string;
-}
-
-export interface RadarRelease {
-    id: number;
-    tmdbMediaType: 'movie' | 'tv';
-    title: string;
-    posterUrl?: string;
-    releaseDate: string;
-    reason: string;
 }
 
 export interface TMDbSearchResult {
