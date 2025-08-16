@@ -1,18 +1,8 @@
 import { db } from './firebaseConfig';
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { AllManagedWatchedData, Challenge } from '../types';
+import { AllManagedWatchedData, Challenge, ChallengeStep } from '../types';
 import { fetchWeeklyChallenge, formatWatchedDataForPrompt } from './GeminiService'; 
 import { fetchPosterUrl } from './TMDbService';
-
-// Função auxiliar que adiciona um "cronómetro" a uma promessa
-function promiseWithTimeout<T>(promise: Promise<T>, ms: number, timeoutError = new Error('A operação demorou muito para responder.')): Promise<T> {
-    const timeout = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-            reject(timeoutError);
-        }, ms);
-    });
-    return Promise.race([promise, timeout]);
-}
 
 const getCurrentWeekId = (): string => {
     const now = new Date();
@@ -28,16 +18,13 @@ export const getWeeklyChallenge = async (watchedData: AllManagedWatchedData): Pr
     const challengeSnap = await getDoc(challengeRef);
 
     if (challengeSnap.exists()) {
-        console.log("Desafio encontrado no Firebase para a semana:", weekId);
         return challengeSnap.data() as Challenge;
     }
 
     console.log("Gerando novo desafio para a semana:", weekId);
     
-    const allWatchedTitles = Object.values(watchedData).flat().map(item => item.title).join(', ');
     const currentDate = new Date().toLocaleDateString('pt-BR', { month: 'long', day: 'numeric' });
     const formattedData = formatWatchedDataForPrompt(watchedData);
-
     const prompt = `Hoje é ${currentDate}. Você é o "CineGênio Pessoal". Sua tarefa é analisar o perfil de um usuário e criar um "Desafio Semanal" criativo e temático.
 
 **REGRAS DO DESAFIO:**
@@ -55,6 +42,7 @@ Gere UM desafio. Sua resposta DEVE ser um único objeto JSON com a estrutura exa
     
     const challengeData = await fetchWeeklyChallenge(prompt);
 
+    // ### LÓGICA DE CONSTRUÇÃO CORRIGIDA ###
     const newChallenge: Challenge = {
         id: weekId,
         challengeType: challengeData.challengeType,
@@ -63,8 +51,10 @@ Gere UM desafio. Sua resposta DEVE ser um único objeto JSON com a estrutura exa
     };
 
     if (challengeData.steps && challengeData.steps.length > 0) {
+        // É um desafio de múltiplos passos
         newChallenge.steps = challengeData.steps.map((step: any) => ({ ...step, completed: false }));
     } else {
+        // É um desafio de passo único
         newChallenge.tmdbId = challengeData.tmdbId;
         newChallenge.tmdbMediaType = challengeData.tmdbMediaType;
         newChallenge.title = challengeData.title;
