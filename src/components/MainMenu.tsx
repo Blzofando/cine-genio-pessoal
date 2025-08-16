@@ -5,7 +5,6 @@ interface MainMenuProps {
   setView: (view: View) => void;
 }
 
-// Botão principal, com um design mais limpo
 const MenuButton = ({ icon, text, onClick }: { icon: string, text: string, onClick: () => void }) => (
     <button
       onClick={onClick}
@@ -16,7 +15,6 @@ const MenuButton = ({ icon, text, onClick }: { icon: string, text: string, onCli
     </button>
 );
 
-// Botão menor para o rodapé
 const FooterButton = ({ icon, text, onClick }: { icon: string, text: string, onClick: () => void }) => (
     <button onClick={onClick} className="flex flex-col items-center gap-1 text-gray-400 hover:text-indigo-400 transition-colors">
         <span className="text-2xl">{icon}</span>
@@ -27,9 +25,7 @@ const FooterButton = ({ icon, text, onClick }: { icon: string, text: string, onC
 const MainMenu: React.FC<MainMenuProps> = ({ setView }) => {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-between p-4">
-      {/* Espaçador para empurrar o conteúdo para o centro e o rodapé para baixo */}
       <div></div>
-
       <div className="w-full max-w-md text-center">
         <div className="mb-12">
             <h1 className="text-5xl font-extrabold text-white tracking-tight">
@@ -46,8 +42,6 @@ const MainMenu: React.FC<MainMenuProps> = ({ setView }) => {
             <MenuButton icon="🏆" text="Desafio do Gênio" onClick={() => setView(View.CHALLENGE)} />
         </div>
       </div>
-
-      {/* Rodapé fixo para as funções de perfil */}
       <footer className="w-full max-w-md bg-gray-800/50 backdrop-blur-sm p-4 rounded-xl border border-gray-700">
         <div className="flex justify-around items-center">
             <FooterButton icon="📚" text="Minha Coleção" onClick={() => setView(View.COLLECTION)} />

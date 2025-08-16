@@ -1,10 +1,17 @@
 import { db } from './firebaseConfig';
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { AllManagedWatchedData, Challenge } from '../types';
-import { fetchWeeklyChallenge } from './GeminiService';
+// AQUI ESTÁ A CORREÇÃO: Importando 'formatWatchedDataForPrompt'
+import { fetchWeeklyChallenge, formatWatchedDataForPrompt } from './GeminiService'; 
 import { fetchPosterUrl } from './TMDbService';
 
-const getCurrentWeekId = (): string => { /* ...código inalterado... */ };
+const getCurrentWeekId = (): string => {
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const day = startOfYear.getDay() > 0 ? startOfYear.getDay() : 7;
+    const weekNumber = Math.ceil((((now.getTime() - startOfYear.getTime()) / 86400000) + day) / 7);
+    return `${now.getFullYear()}-${weekNumber}`;
+};
 
 export const getWeeklyChallenge = async (watchedData: AllManagedWatchedData): Promise<Challenge> => {
     const weekId = getCurrentWeekId();
@@ -17,9 +24,8 @@ export const getWeeklyChallenge = async (watchedData: AllManagedWatchedData): Pr
 
     console.log("Gerando novo desafio para a semana:", weekId);
     
-    // ### PROMPT MELHORADO E MAIS CRIATIVO ###
     const currentDate = new Date().toLocaleDateString('pt-BR', { month: 'long', day: 'numeric' });
-    const formattedData = formatWatchedDataForPrompt(watchedData);
+    const formattedData = formatWatchedDataForPrompt(watchedData); // Agora esta função existe
     const prompt = `Hoje é ${currentDate}. Você é o "CineGênio Pessoal". Sua tarefa é analisar o perfil de um usuário e criar um "Desafio Semanal" criativo e temático.
 
 **REGRAS DO DESAFIO:**
@@ -36,22 +42,23 @@ Gere UM desafio. Sua resposta DEVE ser um único objeto JSON com a estrutura exa
 
     const challengeData = await fetchWeeklyChallenge(prompt);
 
-    // Se for um desafio de passo único, busca o pôster principal
     let posterUrl: string | undefined = undefined;
     if (challengeData.title) {
         posterUrl = await fetchPosterUrl(challengeData.title) ?? undefined;
     }
 
-    // Se for de múltiplos passos, preenche os dados que faltam
-    const steps = challengeData.steps ? await Promise.all(challengeData.steps.map(async step => ({
+    const steps = challengeData.steps ? await Promise.all(challengeData.steps.map(async (step: any) => ({
         ...step,
         completed: false,
-        // Poderíamos buscar pôsteres individuais para cada passo aqui no futuro
     }))) : undefined;
 
     const newChallenge: Challenge = {
         id: weekId,
-        ...challengeData,
+        tmdbId: challengeData.tmdbId,
+        tmdbMediaType: challengeData.tmdbMediaType,
+        title: challengeData.title,
+        challengeType: challengeData.challengeType,
+        reason: challengeData.reason,
         posterUrl,
         steps,
         status: 'active',

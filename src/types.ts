@@ -37,13 +37,32 @@ export interface WatchlistItem {
   title: string;
   posterUrl?: string;
   addedAt: number;
-  loveProbability?: number; // NOVO CAMPO ADICIONADO AQUI
+  loveProbability?: number;
 }
 
-// ... o restante do arquivo types.ts permanece o mesmo
+// ### NOVO TIPO ADICIONADO AQUI ###
+export interface ChallengeStep {
+    title: string;
+    tmdbId: number;
+    completed: boolean;
+}
+
+export interface Challenge {
+    id: string;
+    tmdbId: number;
+    tmdbMediaType: 'movie' | 'tv';
+    title: string;
+    posterUrl?: string;
+    challengeType: string;
+    reason: string;
+    status: 'active' | 'completed' | 'lost';
+    steps?: ChallengeStep[]; // ATUALIZADO PARA USAR O NOVO TIPO
+}
+
 export type AllManagedWatchedData = {
   [key in Rating]: ManagedWatchedItem[];
 };
+
 export interface Recommendation {
   id: number;
   tmdbMediaType: 'movie' | 'tv';
@@ -60,6 +79,7 @@ export interface Recommendation {
   analysis: string;
   posterUrl?: string;
 }
+
 export interface DuelResult {
     title1: {
         title: string;
@@ -75,6 +95,7 @@ export interface DuelResult {
     };
     verdict: string;
 }
+
 export interface RadarRelease {
     id: number;
     tmdbMediaType: 'movie' | 'tv';
@@ -83,18 +104,7 @@ export interface RadarRelease {
     releaseDate: string;
     reason: string;
 }
-export interface Challenge {
-    id: string; // ex: "2025-33" (ano e semana)
-    tmdbId: number;
-    tmdbMediaType: 'movie' | 'tv';
-    title: string;
-    posterUrl?: string;
-    challengeType: string; // Ex: "Desafio do Diretor", "Gênero Oculto"
-    reason: string;
-    status: 'active' | 'completed' | 'lost';
-    // Itens para desafios de múltiplos passos (opcional)
-    steps?: { title: string; tmdbId: number; completed: boolean }[];
-}
+
 export interface TMDbSearchResult {
     id: number;
     title?: string;
@@ -107,11 +117,13 @@ export interface TMDbSearchResult {
     release_date?: string;
     first_air_date?: string;
 }
+
 export type SuggestionFilters = {
     category: MediaType | null;
     genres: string[];
     keywords: string;
 };
+
 export enum View {
   MENU,
   RANDOM,
@@ -122,6 +134,6 @@ export enum View {
   WATCHLIST,
   DUEL,
   RADAR,
-  CHALLENGE, // ADICIONADO AQUI
+  CHALLENGE,
   CHAT
 }

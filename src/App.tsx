@@ -16,14 +16,13 @@ import RandomView from './components/RandomView';
 import PredictView from './components/PredictView';
 import DuelView from './components/DuelView';
 import RadarView from './components/RadarView';
-import ChallengeView from './components/ChallengeView';
+import ChallengeView from './components/ChallengeView'; // Importado aqui
 import ChatView from './components/ChatView';
 
 const initialData: AllManagedWatchedData = {
     amei: [], gostei: [], meh: [], naoGostei: []
 };
 
-// --- WatchedDataContext ---
 interface IWatchedDataContext {
     data: AllManagedWatchedData;
     loading: boolean;
@@ -61,24 +60,20 @@ const WatchedDataProvider = ({ children }: { children: React.ReactNode }) => {
     useEffect(() => {
         setLoading(true);
         const collectionRef = collection(db, 'watchedItems');
-
         const unsubscribe = onSnapshot(collectionRef, (querySnapshot) => {
             const items: ManagedWatchedItem[] = [];
             querySnapshot.forEach((doc) => {
                 items.push(doc.data() as ManagedWatchedItem);
             });
-
             const groupedData = items.reduce((acc, item) => {
                 const rating = item.rating || 'meh';
                 acc[rating].push(item);
                 return acc;
             }, { amei: [], gostei: [], meh: [], naoGostei: [] } as AllManagedWatchedData);
-
             Object.keys(groupedData).forEach(key => {
                 const ratingKey = key as Rating;
                 groupedData[ratingKey].sort((a, b) => b.createdAt - a.createdAt);
             });
-            
             setData(groupedData);
             setLoading(false);
         }, (err) => {
@@ -86,7 +81,6 @@ const WatchedDataProvider = ({ children }: { children: React.ReactNode }) => {
             setError("Não foi possível carregar sua coleção.");
             setLoading(false);
         });
-
         return () => unsubscribe();
     }, []);
     
@@ -135,32 +129,17 @@ const WatchedDataProvider = ({ children }: { children: React.ReactNode }) => {
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.MENU);
-  
-  // ### NOVO ESTADO PARA COMUNICAÇÃO ###
   const [chatFilters, setChatFilters] = useState<SuggestionFilters | null>(null);
 
   const renderView = () => {
     const handleBackToMenu = () => setCurrentView(View.MENU);
-    
-    // Função para limpar os filtros após serem usados
     const clearChatFilters = () => setChatFilters(null);
 
     switch (currentView) {
       case View.MENU:
         return <MainMenu setView={setCurrentView} />;
-      
-      // ### ALTERAÇÃO AQUI ###
-      // Passamos os filtros e a função de limpeza para o SuggestionView
       case View.SUGGESTION:
-        return (
-            <ViewContainer onBack={handleBackToMenu}>
-                <SuggestionView 
-                    preloadedFilters={chatFilters} 
-                    clearPreloadedFilters={clearChatFilters} 
-                />
-            </ViewContainer>
-        );
-
+        return ( <ViewContainer onBack={handleBackToMenu}><SuggestionView preloadedFilters={chatFilters} clearPreloadedFilters={clearChatFilters} /></ViewContainer> );
       case View.STATS:
         return <ViewContainer onBack={handleBackToMenu}><StatsView /></ViewContainer>;
       case View.COLLECTION:
@@ -175,21 +154,10 @@ const App: React.FC = () => {
         return <ViewContainer onBack={handleBackToMenu}><DuelView /></ViewContainer>;
       case View.RADAR:
         return <ViewContainer onBack={handleBackToMenu}><RadarView /></ViewContainer>;
-      case View.CHALLENGE:
+      case View.CHALLENGE: // Novo case adicionado
         return <ViewContainer onBack={handleBackToMenu}><ChallengeView /></ViewContainer>;
-
-      // ### ALTERAÇÃO AQUI ###
-      // Passamos a função para setar os filtros para o ChatView
       case View.CHAT:
-        return (
-            <ViewContainer onBack={handleBackToMenu}>
-                <ChatView 
-                    setView={setCurrentView} 
-                    setSuggestionFilters={setChatFilters} 
-                />
-            </ViewContainer>
-        );
-        
+        return ( <ViewContainer onBack={handleBackToMenu}><ChatView setView={setCurrentView} setSuggestionFilters={setChatFilters} /></ViewContainer> );
       default:
         return <MainMenu setView={setCurrentView} />;
     }
@@ -207,4 +175,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
