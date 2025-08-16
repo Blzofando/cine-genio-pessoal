@@ -4,6 +4,16 @@ import { AllManagedWatchedData, Challenge } from '../types';
 import { fetchWeeklyChallenge, formatWatchedDataForPrompt } from './GeminiService'; 
 import { fetchPosterUrl } from './TMDbService';
 
+// Função auxiliar que adiciona um "cronómetro" a uma promessa
+function promiseWithTimeout<T>(promise: Promise<T>, ms: number, timeoutError = new Error('A operação demorou muito para responder.')): Promise<T> {
+    const timeout = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+            reject(timeoutError);
+        }, ms);
+    });
+    return Promise.race([promise, timeout]);
+}
+
 const getCurrentWeekId = (): string => {
     const now = new Date();
     const startOfYear = new Date(now.getFullYear(), 0, 1);
@@ -18,10 +28,12 @@ export const getWeeklyChallenge = async (watchedData: AllManagedWatchedData): Pr
     const challengeSnap = await getDoc(challengeRef);
 
     if (challengeSnap.exists()) {
+        console.log("Desafio encontrado no Firebase para a semana:", weekId);
         return challengeSnap.data() as Challenge;
     }
 
-    // ### LÓGICA DE EXCLUSÃO ADICIONADA AQUI ###
+    console.log("Gerando novo desafio para a semana:", weekId);
+    
     const allWatchedTitles = Object.values(watchedData).flat().map(item => item.title).join(', ');
     const currentDate = new Date().toLocaleDateString('pt-BR', { month: 'long', day: 'numeric' });
     const formattedData = formatWatchedDataForPrompt(watchedData);
@@ -43,7 +55,12 @@ ${formattedData}
 **Sua Tarefa:**
 Gere UM desafio. Sua resposta DEVE ser um único objeto JSON com a estrutura exata definida no schema.`;
 
-    const challengeData = await fetchWeeklyChallenge(prompt);
+    console.log("Chamando a IA para gerar desafio...");
+    
+    // A chamada à IA agora está "envolvida" pelo cronómetro de 20 segundos.
+    const challengeData = await promiseWithTimeout(fetchWeeklyChallenge(prompt), 20000);
+    
+    console.log("IA respondeu com sucesso.");
 
     const newChallenge: Challenge = {
         id: weekId,
@@ -62,6 +79,7 @@ Gere UM desafio. Sua resposta DEVE ser um único objeto JSON com a estrutura exa
     }
 
     await setDoc(challengeRef, newChallenge);
+    console.log("Novo desafio salvo no Firebase.");
     return newChallenge;
 };
 
