@@ -1,114 +1,174 @@
+// src/components/RadarView.tsx
+
 import React, { useState, useContext, useEffect } from 'react';
 import { WatchedDataContext } from '../App';
-import { WatchlistContext } from '../contexts/WatchlistContext';
-import { getPersonalizedRadar } from '../services/RecommendationService';
-import { RadarRelease, WatchlistItem, ManagedWatchedItem } from '../types';
+import { CalendarItem, RadarItem, WatchProvider } from '../types';
+import { getRelevantReleases, getMyCalendar, addToMyCalendar, removeFromMyCalendar } from '../services/firestoreService';
+import { updateRelevantReleasesIfNeeded } from '../services/RadarUpdateService';
+import { getTMDbDetails, getProviders } from '../services/TMDbService';
 
-const LoadingSpinner = () => (
-    <div className="flex flex-col items-center justify-center space-y-2 mt-8">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-400"></div>
-      <span className="text-lg text-gray-400">A procurar futuros favoritos no horizonte...</span>
+// --- Componentes ---
+
+const Modal = ({ children, onClose }: { children: React.ReactNode, onClose: () => void }) => ( <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={onClose}><div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up" onClick={e => e.stopPropagation()}>{children}</div></div>);
+const WatchProvidersDisplay: React.FC<{ providers: WatchProvider[] }> = ({ providers }) => ( <div className="flex flex-wrap gap-3">{providers.map(p => (<img key={p.provider_id} src={`https://image.tmdb.org/t/p/w92${p.logo_path}`} alt={p.provider_name} title={p.provider_name} className="w-12 h-12 rounded-lg object-cover bg-gray-700"/>))}</div>);
+
+// Modal de Detalhes para um item do Radar
+interface DetailsModalProps {
+    item: RadarItem;
+    onClose: () => void;
+    onAddToCalendar: (item: RadarItem) => void;
+    isInCalendar: boolean;
+}
+const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToCalendar, isInCalendar }) => {
+    const [details, setDetails] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        setIsLoading(true);
+        getTMDbDetails(item.id, item.tmdbMediaType)
+            .then(data => setDetails(data))
+            .catch(err => console.error("Falha ao buscar detalhes do item do radar", err))
+            .finally(() => setIsLoading(false));
+    }, [item.id, item.tmdbMediaType]);
+
+    return (
+        <Modal onClose={onClose}>
+            <div className="p-6">
+                <h2 className="text-3xl font-bold text-white mb-4">{item.title}</h2>
+                {isLoading ? <div className="h-48 bg-gray-700 rounded animate-pulse"></div> : (
+                    <div>
+                        <p className="text-gray-400 text-sm mb-4">{details?.overview || "Sinopse não disponível."}</p>
+                        {details?.['watch/providers']?.results?.BR?.flatrate && (
+                            <div className="mb-4"><h3 className="text-xl font-semibold text-gray-300 mb-3">Onde Assistir</h3><WatchProvidersDisplay providers={details['watch/providers'].results.BR.flatrate} /></div>
+                        )}
+                        {item.type === 'tv' && details?.number_of_episodes && (
+                             <p className="text-sm text-gray-400"><strong>Episódios:</strong> {details.number_of_episodes}</p>
+                        )}
+                    </div>
+                )}
+                <div className="mt-6 pt-6 border-t border-gray-700 flex flex-col sm:flex-row gap-3">
+                    <button onClick={() => onAddToCalendar(item)} disabled={isInCalendar} className="w-full sm:w-auto flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
+                        {isInCalendar ? 'Já está no Calendário' : 'Adicionar ao Meu Calendário'}
+                    </button>
+                    <button onClick={onClose} className="w-full sm:w-auto flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Fechar</button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
+// Card individual para os carrosséis
+interface CarouselCardProps {
+    item: RadarItem;
+    onClick: () => void;
+}
+const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick }) => (
+    <div onClick={onClick} className="flex-shrink-0 w-40 cursor-pointer group">
+        <div className="relative overflow-hidden rounded-lg shadow-lg">
+            <img src={item.posterUrl || 'https://placehold.co/400x600/374151/9ca3af?text=?'} alt={`Pôster de ${item.title}`} className="w-full h-60 object-cover transition-transform duration-300 group-hover:scale-105"/>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+        </div>
+        <h3 className="text-white font-bold mt-2 truncate">{item.title}</h3>
+        <p className="text-indigo-400 text-sm">{new Date(item.releaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</p>
     </div>
 );
 
-interface ReleaseCardProps {
-    release: RadarRelease;
+// Carrossel Horizontal
+interface CarouselProps {
+    title: string;
+    items: RadarItem[];
+    onItemClick: (item: RadarItem) => void;
 }
-
-// CORREÇÃO: Declaramos o componente como React.FC<ReleaseCardProps>
-const ReleaseCard: React.FC<ReleaseCardProps> = ({ release }) => {
-    const { addToWatchlist, isInWatchlist } = useContext(WatchlistContext);
-    const { data: watchedData } = useContext(WatchedDataContext);
-    const [isSaved, setIsSaved] = useState(false);
-
-    const isInCollection = Object.values(watchedData).flat().some((item: ManagedWatchedItem) => item.id === release.id);
-    const showSaveButton = !isInCollection && !isInWatchlist(release.id) && !isSaved;
-
-    const handleSaveToWatchlist = () => {
-        const item: WatchlistItem = {
-            id: release.id,
-            tmdbMediaType: release.tmdbMediaType,
-            title: release.title,
-            posterUrl: release.posterUrl,
-            addedAt: Date.now(),
-        };
-        addToWatchlist(item);
-        setIsSaved(true);
-    };
-
-    return (
-        <div className="bg-gray-800 rounded-lg p-4 flex flex-col sm:flex-row items-start gap-4 border border-gray-700">
-            <img 
-                src={release.posterUrl || 'https://placehold.co/150x225/374151/9ca3af?text=?'} 
-                alt={`Pôster de ${release.title}`} 
-                className="w-24 sm:w-28 h-auto object-cover rounded-md shadow-lg flex-shrink-0"
-            />
-            <div className="text-left flex-grow">
-                <h3 className="text-xl font-bold text-white">{release.title}</h3>
-                <p className="text-sm text-indigo-400 font-semibold mb-2">Lançamento: {new Date(release.releaseDate).toLocaleDateString()}</p>
-                <p className="text-sm text-gray-300 mb-4"><span className="font-bold text-gray-400">Porquê está no seu radar:</span> {release.reason}</p>
-                {showSaveButton && (
-                    <button onClick={handleSaveToWatchlist} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors">
-                        + Salvar na Lista
-                    </button>
-                )}
-                {isSaved && <p className="text-green-400 font-semibold text-sm">Salvo na sua lista!</p>}
-                {isInWatchlist(release.id) && <p className="text-gray-400 font-semibold text-sm">Já está na sua lista.</p>}
-                {isInCollection && <p className="text-gray-400 font-semibold text-sm">Já está na sua coleção.</p>}
-            </div>
+const Carousel: React.FC<CarouselProps> = ({ title, items, onItemClick }) => (
+    <div className="mb-12">
+        <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>
+        <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
+            {items.map(item => <CarouselCard key={item.id} item={item} onClick={() => onItemClick(item)} />)}
+            {items.length === 0 && <p className="text-gray-500">Nenhum item nesta categoria por enquanto.</p>}
         </div>
-    );
-};
+    </div>
+);
 
 
 const RadarView: React.FC = () => {
     const { data: watchedData } = useContext(WatchedDataContext);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [releases, setReleases] = useState<RadarRelease[]>([]);
+    const [relevantReleases, setRelevantReleases] = useState<RadarItem[]>([]);
+    const [myCalendar, setMyCalendar] = useState<CalendarItem[]>([]);
+    const [selectedItem, setSelectedItem] = useState<RadarItem | null>(null);
 
     useEffect(() => {
-        const fetchRadar = async () => {
-            if (Object.values(watchedData).flat().length === 0) {
-                setIsLoading(false);
-                return;
-            }
+        const initializeRadar = async () => {
             setIsLoading(true);
             setError(null);
             try {
-                const personalizedReleases = await getPersonalizedRadar(watchedData);
-                setReleases(personalizedReleases);
+                // Aciona a atualização em segundo plano (só executa se necessário)
+                await updateRelevantReleasesIfNeeded(watchedData);
+
+                // Busca os dados já persistidos para exibir na tela imediatamente
+                const [releases, calendar] = await Promise.all([
+                    getRelevantReleases(),
+                    getMyCalendar()
+                ]);
+
+                setRelevantReleases(releases);
+                setMyCalendar(calendar);
+
             } catch (err) {
-                setError("Não foi possível procurar os lançamentos do radar.");
+                setError(err instanceof Error ? err.message : "Não foi possível carregar o Radar.");
                 console.error(err);
             } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchRadar();
+        if (watchedData) {
+            initializeRadar();
+        }
     }, [watchedData]);
+    
+    const handleAddToCalendar = async (item: RadarItem) => {
+        const calendarItem: CalendarItem = { ...item, addedAt: Date.now() };
+        await addToMyCalendar(calendarItem);
+        setMyCalendar(prev => [...prev, calendarItem]);
+        setSelectedItem(null); // Fecha o modal
+    };
+    
+    // Separa os itens para os carrosséis
+    const upcomingMovies = relevantReleases
+        .filter(r => r.type === 'movie')
+        .sort((a, b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime())
+        .slice(0, 20);
+
+    const onTheAirShows = relevantReleases
+        .filter(r => r.type === 'tv')
+        .sort((a, b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime())
+        .slice(0, 20);
 
     return (
-        <div className="flex flex-col items-center p-4 text-center">
-            <h1 className="text-4xl font-bold text-white mb-2">Radar de Lançamentos</h1>
-            <p className="text-lg text-gray-400 mb-8 max-w-2xl">
-                O Gênio vasculhou o futuro e encontrou estes próximos lançamentos que têm tudo a ver consigo.
-            </p>
-
-            {isLoading && <LoadingSpinner />}
-            {error && <p className="mt-8 text-red-400 bg-red-900/50 p-4 rounded-lg w-full max-w-2xl">{error}</p>}
-
-            {!isLoading && !error && releases.length === 0 && (
-                 <div className="text-center py-16">
-                    <p className="text-2xl text-gray-400">Nenhum lançamento relevante no radar por enquanto.</p>
-                    <p className="text-gray-500 mt-2">Volte mais tarde para novas descobertas!</p>
-                </div>
+        <div className="p-4">
+            {selectedItem && (
+                <DetailsModal 
+                    item={selectedItem} 
+                    onClose={() => setSelectedItem(null)} 
+                    onAddToCalendar={handleAddToCalendar}
+                    isInCalendar={myCalendar.some(ci => ci.id === selectedItem.id)}
+                />
             )}
+            
+            <div className="text-center mb-10">
+                <h1 className="text-4xl font-bold text-white mb-2">LANÇAMENTOS RELEVANTES</h1>
+                <p className="text-lg text-gray-400">O seu calendário pessoal de futuros favoritos.</p>
+            </div>
 
-            {!isLoading && !error && releases.length > 0 && (
-                <div className="w-full max-w-3xl space-y-4">
-                    {releases.map(item => <ReleaseCard key={item.id} release={item} />)}
+            {isLoading && <p className="text-center text-gray-400">A carregar o seu radar...</p>}
+            {error && <p className="text-center text-red-400">{error}</p>}
+            
+            {!isLoading && !error && (
+                <div>
+                    <Carousel title="Próximos nos Cinemas" items={upcomingMovies} onItemClick={setSelectedItem} />
+                    <Carousel title="Séries No Ar" items={onTheAirShows} onItemClick={setSelectedItem} />
                 </div>
             )}
         </div>

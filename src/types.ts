@@ -97,13 +97,26 @@ export interface DuelResult {
     verdict: string;
 }
 
-export interface RadarRelease {
-    id: number;
+// NOVO: Representa um item na lista de lançamentos relevantes
+export interface RadarItem {
+    id: number; // TMDB ID
     tmdbMediaType: 'movie' | 'tv';
     title: string;
     posterUrl?: string;
-    releaseDate: string;
-    reason: string;
+    releaseDate: string; // Data de lançamento (ex: "2025-12-25")
+    type: 'movie' | 'tv';
+    // Para séries "No Ar"
+    status?: string; // Ex: "Returning Series"
+    nextEpisodeToAir?: {
+        air_date: string;
+        episode_number: number;
+        season_number: number;
+    };
+}
+
+// NOVO: Representa um item que o usuário salvou no seu calendário pessoal
+export interface CalendarItem extends RadarItem {
+    addedAt: number;
 }
 
 export interface TMDbSearchResult {

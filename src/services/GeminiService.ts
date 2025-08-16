@@ -1,7 +1,7 @@
 // src/services/GeminiService.ts (Completo)
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { AllManagedWatchedData, ManagedWatchedItem, Recommendation, DuelResult, RadarRelease, Challenge } from '../types';
+import { AllManagedWatchedData, ManagedWatchedItem, Recommendation, DuelResult, Challenge } from '../types';
 
 // Exportando esta função para que outros serviços possam usá-la
 export const formatWatchedDataForPrompt = (data: AllManagedWatchedData): string => {
@@ -159,7 +159,7 @@ export const fetchDuelAnalysis = async (prompt: string): Promise<DuelResult> => 
     return JSON.parse(response.text.trim());
 };
 
-export const fetchPersonalizedRadar = async (prompt: string): Promise<{ releases: Omit<RadarRelease, 'posterUrl' | 'releaseDate'>[] }> => {
+export const fetchPersonalizedRadar = async (prompt: string): Promise<{ releases: { id: number; tmdbMediaType: 'movie' | 'tv'; title: string; reason: string; }[] }> => {
     if (!import.meta.env.VITE_GEMINI_API_KEY) {
         return { releases: [] };
     }
