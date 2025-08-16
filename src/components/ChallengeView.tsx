@@ -1,8 +1,9 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { WatchedDataContext } from '../App';
-import { Challenge } from '../types';
+import { Challenge, ChallengeStep } from '../types'; // 'ChallengeStep' importado para clareza
 import { getWeeklyChallenge, updateChallenge } from '../services/ChallengeService';
 import { fetchPosterUrl } from '../services/TMDbService';
+
 
 const LoadingSpinner = () => (
     <div className="flex flex-col items-center justify-center space-y-2 mt-8">
@@ -10,10 +11,8 @@ const LoadingSpinner = () => (
       <span className="text-lg text-gray-400">O Gênio está a preparar o seu desafio...</span>
     </div>
 );
-
-// --- Componente para um passo individual em um desafio de múltiplos passos ---
 interface StepCardProps {
-    step: Challenge['steps'][number];
+    step: ChallengeStep; // Usando o tipo importado
     onToggleStep: () => void;
 }
 const StepCard: React.FC<StepCardProps> = ({ step, onToggleStep }) => {

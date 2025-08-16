@@ -1,7 +1,6 @@
 import { db } from './firebaseConfig';
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { AllManagedWatchedData, Challenge } from '../types';
-// AQUI ESTÁ A CORREÇÃO: Importando 'formatWatchedDataForPrompt'
+import { AllManagedWatchedData, Challenge, ChallengeStep } from '../types';
 import { fetchWeeklyChallenge, formatWatchedDataForPrompt } from './GeminiService'; 
 import { fetchPosterUrl } from './TMDbService';
 
@@ -25,7 +24,7 @@ export const getWeeklyChallenge = async (watchedData: AllManagedWatchedData): Pr
     console.log("Gerando novo desafio para a semana:", weekId);
     
     const currentDate = new Date().toLocaleDateString('pt-BR', { month: 'long', day: 'numeric' });
-    const formattedData = formatWatchedDataForPrompt(watchedData); // Agora esta função existe
+    const formattedData = formatWatchedDataForPrompt(watchedData);
     const prompt = `Hoje é ${currentDate}. Você é o "CineGênio Pessoal". Sua tarefa é analisar o perfil de um usuário e criar um "Desafio Semanal" criativo e temático.
 
 **REGRAS DO DESAFIO:**
@@ -42,27 +41,24 @@ Gere UM desafio. Sua resposta DEVE ser um único objeto JSON com a estrutura exa
 
     const challengeData = await fetchWeeklyChallenge(prompt);
 
-    let posterUrl: string | undefined = undefined;
-    if (challengeData.title) {
-        posterUrl = await fetchPosterUrl(challengeData.title) ?? undefined;
-    }
-
-    const steps = challengeData.steps ? await Promise.all(challengeData.steps.map(async (step: any) => ({
-        ...step,
-        completed: false,
-    }))) : undefined;
-
+    // ### LÓGICA DE CONSTRUÇÃO CORRIGIDA ###
     const newChallenge: Challenge = {
         id: weekId,
-        tmdbId: challengeData.tmdbId,
-        tmdbMediaType: challengeData.tmdbMediaType,
-        title: challengeData.title,
         challengeType: challengeData.challengeType,
         reason: challengeData.reason,
-        posterUrl,
-        steps,
         status: 'active',
     };
+
+    if (challengeData.steps && challengeData.steps.length > 0) {
+        // É um desafio de múltiplos passos
+        newChallenge.steps = challengeData.steps.map((step: any) => ({ ...step, completed: false }));
+    } else {
+        // É um desafio de passo único
+        newChallenge.tmdbId = challengeData.tmdbId;
+        newChallenge.tmdbMediaType = challengeData.tmdbMediaType;
+        newChallenge.title = challengeData.title;
+        newChallenge.posterUrl = await fetchPosterUrl(challengeData.title || "") ?? undefined;
+    }
 
     await setDoc(challengeRef, newChallenge);
     return newChallenge;

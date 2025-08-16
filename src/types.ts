@@ -47,16 +47,19 @@ export interface ChallengeStep {
     completed: boolean;
 }
 
+// ### INTERFACE CORRIGIDA ###
 export interface Challenge {
-    id: string;
-    tmdbId: number;
-    tmdbMediaType: 'movie' | 'tv';
-    title: string;
-    posterUrl?: string;
+    id: string; 
     challengeType: string;
     reason: string;
     status: 'active' | 'completed' | 'lost';
-    steps?: ChallengeStep[]; // ATUALIZADO PARA USAR O NOVO TIPO
+    // Propriedades para desafio de PASSO ÚNICO (agora opcionais)
+    tmdbId?: number;
+    tmdbMediaType?: 'movie' | 'tv';
+    title?: string;
+    posterUrl?: string;
+    // Propriedades para desafio de MÚLTIPLOS PASSOS (opcional)
+    steps?: ChallengeStep[];
 }
 
 export type AllManagedWatchedData = {
