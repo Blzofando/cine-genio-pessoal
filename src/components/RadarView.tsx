@@ -7,7 +7,7 @@ import { relevantReleasesCollection } from '../services/firestoreService';
 import { updateRelevantReleasesIfNeeded } from '../services/RadarUpdateService';
 import { getTMDbDetails } from '../services/TMDbService';
 
-// --- Componentes Internos ---
+// --- Componentes Internos (Modal, DetailsModal, CarouselCard, Carousel) ---
 const Modal = ({ children, onClose }: { children: React.ReactNode, onClose: () => void }) => ( <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={onClose}><div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up" onClick={e => e.stopPropagation()}>{children}</div></div>);
 const WatchProvidersDisplay: React.FC<{ providers: WatchProvider[] }> = ({ providers }) => ( <div className="flex flex-wrap gap-3">{providers.map(p => (<img key={p.provider_id} src={`https://image.tmdb.org/t/p/w92${p.logo_path}`} alt={p.provider_name} title={p.provider_name} className="w-12 h-12 rounded-lg object-cover bg-gray-700"/>))}</div>);
 
@@ -15,7 +15,6 @@ interface DetailsModalProps { item: RadarItem; onClose: () => void; onAddToWatch
 const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatchlist, isInWatchlist }) => {
     const [details, setDetails] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
-
     useEffect(() => {
         setIsLoading(true);
         getTMDbDetails(item.id, item.tmdbMediaType)
@@ -23,7 +22,6 @@ const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatch
             .catch(err => console.error("Falha ao buscar detalhes do item do radar", err))
             .finally(() => setIsLoading(false));
     }, [item.id, item.tmdbMediaType]);
-
     return (
         <Modal onClose={onClose}>
             <div className="p-6">
@@ -38,33 +36,18 @@ const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatch
                                 <span>{details?.genres?.[0]?.name || 'N/A'}</span>
                             </div>
                         )}
-                        {isLoading ? (
-                            <div className="space-y-2 mt-4">
-                                <div className="h-4 bg-gray-700 rounded animate-pulse w-full"></div>
-                                <div className="h-4 bg-gray-700 rounded animate-pulse w-full"></div>
-                                <div className="h-4 bg-gray-700 rounded animate-pulse w-5/6"></div>
-                            </div>
-                        ) : (
-                            <p className="text-gray-300 text-sm mb-4">{details?.overview || "Sinopse não disponível."}</p>
-                        )}
+                        {isLoading ? <div className="space-y-2 mt-4"><div className="h-4 bg-gray-700 rounded animate-pulse w-full"></div><div className="h-4 bg-gray-700 rounded animate-pulse w-5/6"></div></div> : <p className="text-gray-300 text-sm mb-4">{details?.overview || "Sinopse não disponível."}</p>}
                     </div>
                 </div>
-                {isLoading ? <div className="h-20 mt-4 bg-gray-700 rounded animate-pulse"></div> : (
-                    details?.['watch/providers']?.results?.BR?.flatrate && (
-                        <div className="mt-4"><h3 className="text-xl font-semibold text-gray-300 mb-3">Onde Assistir</h3><WatchProvidersDisplay providers={details['watch/providers'].results.BR.flatrate} /></div>
-                    )
-                )}
+                {isLoading ? <div className="h-20 mt-4 bg-gray-700 rounded animate-pulse"></div> : (details?.['watch/providers']?.results?.BR?.flatrate && <div className="mt-4"><h3 className="text-xl font-semibold text-gray-300 mb-3">Onde Assistir</h3><WatchProvidersDisplay providers={details['watch/providers'].results.BR.flatrate} /></div>)}
                 <div className="mt-6 pt-6 border-t border-gray-700 flex flex-col sm:flex-row gap-3">
-                    <button onClick={() => onAddToWatchlist(item)} disabled={isInWatchlist} className="w-full sm:w-auto flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
-                        {isInWatchlist ? 'Já está na Watchlist' : 'Adicionar à Watchlist'}
-                    </button>
+                    <button onClick={() => onAddToWatchlist(item)} disabled={isInWatchlist} className="w-full sm:w-auto flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">{isInWatchlist ? 'Já está na Watchlist' : 'Adicionar à Watchlist'}</button>
                     <button onClick={onClose} className="w-full sm:w-auto flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Fechar</button>
                 </div>
             </div>
         </Modal>
     );
 };
-
 interface CarouselCardProps { item: RadarItem; onClick: () => void; rank?: number; }
 const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick, rank }) => (
     <div onClick={onClick} className="flex-shrink-0 w-40 cursor-pointer group">
@@ -77,13 +60,12 @@ const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick, rank }) => (
         <p className="text-indigo-400 text-sm">{new Date(item.releaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}</p>
     </div>
 );
-
 interface CarouselProps { title: string; items: RadarItem[]; onItemClick: (item: RadarItem) => void; isRanked?: boolean; }
 const Carousel: React.FC<CarouselProps> = ({ title, items, onItemClick, isRanked = false }) => (
     <div className="mb-12">
         <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
-            {items.length > 0 ? items.map((item, index) => <CarouselCard key={`${item.id}-${item.listType}`} item={item} onClick={() => onItemClick(item)} rank={isRanked ? index + 1 : undefined} />) : <p className="text-gray-500">Nenhum item nesta categoria por enquanto.</p>}
+            {items.length > 0 ? items.map((item, index) => <CarouselCard key={`${item.id}-${item.listType}`} item={item} onClick={() => onItemClick(item)} rank={isRanked ? index + 1 : undefined} />) : <p className="text-gray-500">A carregar...</p>}
         </div>
     </div>
 );
