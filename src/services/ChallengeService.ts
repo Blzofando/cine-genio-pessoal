@@ -1,8 +1,8 @@
 import { db } from './firebaseConfig';
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { AllManagedWatchedData, Challenge, ChallengeStep } from '../types';
-import { fetchWeeklyChallenge, formatWatchedDataForPrompt } from './GeminiService'; 
-import { fetchPosterUrl } from './TMDbService';
+import { AllManagedWatchedData, Challenge } from '../types';
+import { fetchChallengeIdea, formatWatchedDataForPrompt } from './GeminiService'; 
+import { searchTMDb } from './TMDbService';
 
 const getCurrentWeekId = (): string => {
     const now = new Date();
@@ -18,50 +18,54 @@ export const getWeeklyChallenge = async (watchedData: AllManagedWatchedData): Pr
     const challengeSnap = await getDoc(challengeRef);
 
     if (challengeSnap.exists()) {
+        console.log("Desafio encontrado no Firebase para a semana:", weekId);
         return challengeSnap.data() as Challenge;
     }
 
     console.log("Gerando novo desafio para a semana:", weekId);
     
-    const currentDate = new Date().toLocaleDateString('pt-BR', { month: 'long', day: 'numeric' });
+    // --- ETAPA 1: PEDIR A IDEIA CRIATIVA À IA ---
+    const allWatchedTitles = Object.values(watchedData).flat().map(item => item.title).join(', ');
     const formattedData = formatWatchedDataForPrompt(watchedData);
-    const prompt = `Hoje é ${currentDate}. Você é o "CineGênio Pessoal". Sua tarefa é analisar o perfil de um usuário e criar um "Desafio Semanal" criativo e temático.
-
-**REGRAS DO DESAFIO:**
-1. Seja Criativo: Crie temas como "Maratona de um Diretor", "Clássicos de Halloween" (se for Outubro), etc.
-2. Passo Único ou Múltiplo: O desafio pode ser assistir a um único filme ou uma lista.
-3. Conecte com o Gosto: O desafio deve ter alguma conexão com o que o usuário já ama.
-4. Seja Convincente: A razão deve ser curta e despertar a curiosidade.
-5. IMPORTANTE: Não sugerir títulos já assistidos pelo usuário.
-
-**PERFIL DO USUÁRIO:**
+    const prompt = `Analise o perfil de gosto de um usuário e crie a IDEIA para um desafio semanal.
+    
+**PERFIL DE GOSTO:**
 ${formattedData}
 
-**Sua Tarefa:**
-Gere UM desafio. Sua resposta DEVE ser um único objeto JSON com a estrutura exata definida no schema.`;
-    
-    const challengeData = await fetchWeeklyChallenge(prompt);
+**TÍTULOS JÁ VISTOS (A SEREM EVITADOS):**
+${allWatchedTitles}
 
-    // ### LÓGICA DE CONSTRUÇÃO CORRIGIDA ###
+**Sua Tarefa:**
+Retorne um objeto JSON com um "challengeType" (um nome criativo), uma "reason" (justificativa curta) e uma "searchQuery" (termo de busca para a API de filmes).`;
+
+    const idea = await fetchChallengeIdea(prompt);
+    console.log("Ideia recebida da IA:", idea);
+
+    // --- ETAPA 2: USAR A IDEIA PARA BUSCAR O FILME NO TMDB ---
+    const searchResults = await searchTMDb(idea.searchQuery);
+    
+    const allWatchedIds = Object.values(watchedData).flat().map(item => item.id);
+    const validResult = searchResults.find(result => !allWatchedIds.includes(result.id));
+
+    if (!validResult) {
+        throw new Error("Não foi possível encontrar um filme inédito para o desafio gerado.");
+    }
+    console.log("Título encontrado no TMDb:", validResult.title || validResult.name);
+
+    // --- ETAPA 3: MONTAR E SALVAR O DESAFIO COMPLETO ---
     const newChallenge: Challenge = {
         id: weekId,
-        challengeType: challengeData.challengeType,
-        reason: challengeData.reason,
+        challengeType: idea.challengeType,
+        reason: idea.reason,
         status: 'active',
+        tmdbId: validResult.id,
+        tmdbMediaType: validResult.media_type,
+        title: `${validResult.title || validResult.name} (${new Date(validResult.release_date || validResult.first_air_date || '').getFullYear()})`,
+        posterUrl: validResult.poster_path ? `https://image.tmdb.org/t/p/w500${validResult.poster_path}` : undefined,
     };
 
-    if (challengeData.steps && challengeData.steps.length > 0) {
-        // É um desafio de múltiplos passos
-        newChallenge.steps = challengeData.steps.map((step: any) => ({ ...step, completed: false }));
-    } else {
-        // É um desafio de passo único
-        newChallenge.tmdbId = challengeData.tmdbId;
-        newChallenge.tmdbMediaType = challengeData.tmdbMediaType;
-        newChallenge.title = challengeData.title;
-        newChallenge.posterUrl = await fetchPosterUrl(challengeData.title || "") ?? undefined;
-    }
-
     await setDoc(challengeRef, newChallenge);
+    console.log("Novo desafio salvo no Firebase.");
     return newChallenge;
 };
 
