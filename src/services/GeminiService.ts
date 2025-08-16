@@ -133,9 +133,10 @@ const challengeIdeaSchena = {
     properties: {
         challengeType: { type: Type.STRING, description: "Um nome criativo e temático para o desafio (ex: 'Maratona do Mestre do Suspense', 'Semana de Animações Clássicas')." },
         reason: { type: Type.STRING, description: "Uma justificativa curta e convincente, explicando por que este desafio é perfeito para o usuário." },
-        searchQuery: { type: Type.STRING, description: "Uma query de busca simples e eficaz para encontrar títulos relevantes no TMDb (ex: 'classic italian horror', 'best sci-fi 1980s')." }
+        searchQuery: { type: Type.STRING, description: "Uma query de busca simples e eficaz para encontrar títulos relevantes no TMDb (ex: 'classic italian horror', 'best sci-fi 1980s')." },
+        count: { type: Type.INTEGER, description: "O número de filmes para este desafio (normalmente 1, ou 3 para uma trilogia, etc.)." }
     },
-    required: ["challengeType", "reason", "searchQuery"]
+    required: ["challengeType", "reason", "searchQuery", "count"]
 };
 
 
@@ -192,21 +193,20 @@ export const fetchLoveProbability = async (prompt: string): Promise<number> => {
     return result.loveProbability;
 };
 
-export const fetchWeeklyChallenge = async (prompt: string): Promise<Omit<Challenge, 'id' | 'posterUrl' | 'status'>> => {
+export const fetchChallengeIdea = async (prompt: string): Promise<{ challengeType: string; reason: string; searchQuery: string; count: number; }> => {
     if (!import.meta.env.VITE_GEMINI_API_KEY) {
         return { 
-            tmdbId: 278, 
-            tmdbMediaType: 'movie', 
-            title: "Um Sonho de Liberdade (1994)", 
-            challengeType: "Desafio do Clássico", 
-            reason: "Você adora dramas aclamados, mas este clássico absoluto ainda não está na sua coleção." 
+            challengeType: "Explorador de Clássicos", 
+            reason: "Você adora ficção científica, mas ainda não explorou este pilar do gênero.",
+            searchQuery: "top rated sci-fi 1982",
+            count: 1
         };
     }
     const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY as string });
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
-        config: { responseMimeType: "application/json", responseSchema: challengeSchema }
+        config: { responseMimeType: "application/json", responseSchema: challengeIdeaSchena }
     });
     return JSON.parse(response.text.trim());
 };
