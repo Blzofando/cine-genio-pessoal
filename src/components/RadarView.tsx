@@ -3,7 +3,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { WatchedDataContext } from '../App';
 import { CalendarItem, RadarItem, WatchProvider } from '../types';
-import { getRelevantReleases, getMyCalendar, addToMyCalendar, removeFromMyCalendar } from '../services/firestoreService';
+import { getRelevantReleases, getMyCalendar, addToMyCalendar } from '../services/firestoreService';
 import { updateRelevantReleasesIfNeeded } from '../services/RadarUpdateService';
 import { getTMDbDetails, getProviders } from '../services/TMDbService';
 
@@ -93,6 +93,7 @@ const Carousel: React.FC<CarouselProps> = ({ title, items, onItemClick }) => (
 const RadarView: React.FC = () => {
     const { data: watchedData } = useContext(WatchedDataContext);
     const [isLoading, setIsLoading] = useState(true);
+    const [statusText, setStatusText] = useState("A carregar o seu radar...");
     const [error, setError] = useState<string | null>(null);
     const [relevantReleases, setRelevantReleases] = useState<RadarItem[]>([]);
     const [myCalendar, setMyCalendar] = useState<CalendarItem[]>([]);
@@ -104,9 +105,11 @@ const RadarView: React.FC = () => {
             setError(null);
             try {
                 // Aciona a atualização em segundo plano (só executa se necessário)
+                setStatusText("A verificar se há novidades...");
                 await updateRelevantReleasesIfNeeded(watchedData);
 
                 // Busca os dados já persistidos para exibir na tela imediatamente
+                setStatusText("A carregar lançamentos...");
                 const [releases, calendar] = await Promise.all([
                     getRelevantReleases(),
                     getMyCalendar()
@@ -123,8 +126,12 @@ const RadarView: React.FC = () => {
             }
         };
 
-        if (watchedData) {
+        // Garante que temos os dados do usuário antes de rodar a lógica
+        if (Object.values(watchedData).flat().length > 0) {
             initializeRadar();
+        } else if (!isLoading) {
+             // Se não há dados do usuário e não está carregando, define como pronto.
+             setIsLoading(false)
         }
     }, [watchedData]);
     
@@ -162,7 +169,7 @@ const RadarView: React.FC = () => {
                 <p className="text-lg text-gray-400">O seu calendário pessoal de futuros favoritos.</p>
             </div>
 
-            {isLoading && <p className="text-center text-gray-400">A carregar o seu radar...</p>}
+            {isLoading && <p className="text-center text-gray-400">{statusText}</p>}
             {error && <p className="text-center text-red-400">{error}</p>}
             
             {!isLoading && !error && (
