@@ -2,15 +2,14 @@ import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { onSnapshot } from 'firebase/firestore';
 import { WatchedDataContext } from '../App';
 import { WatchlistContext } from '../contexts/WatchlistContext';
-import { RadarItem, WatchProvider, WatchlistItem, TMDbSearchResult } from '../types';
+import { RadarItem, WatchProvider, WatchlistItem } from '../types';
 import { relevantReleasesCollection } from '../services/firestoreService';
 import { updateRelevantReleasesIfNeeded } from '../services/RadarUpdateService';
-import { getTMDbDetails, getNowPlayingMovies, getTopRatedOnProvider, getTrending } from '../services/TMDbService';
+import { getTMDbDetails } from '../services/TMDbService';
 
-// --- Componentes Internos (Modal, DetailsModal, etc. - inalterados) ---
+// --- Componentes Internos (Modal, DetailsModal, CarouselCard, Carousel - inalterados) ---
 const Modal = ({ children, onClose }: { children: React.ReactNode, onClose: () => void }) => ( <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={onClose}><div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up" onClick={e => e.stopPropagation()}>{children}</div></div>);
 const WatchProvidersDisplay: React.FC<{ providers: WatchProvider[] }> = ({ providers }) => ( <div className="flex flex-wrap gap-3">{providers.map(p => (<img key={p.provider_id} src={`https://image.tmdb.org/t/p/w92${p.logo_path}`} alt={p.provider_name} title={p.provider_name} className="w-12 h-12 rounded-lg object-cover bg-gray-700"/>))}</div>);
-
 interface DetailsModalProps { item: RadarItem; onClose: () => void; onAddToWatchlist: (item: RadarItem) => void; isInWatchlist: boolean; }
 const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatchlist, isInWatchlist }) => {
     const [details, setDetails] = useState<any>(null);
@@ -60,14 +59,12 @@ const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick, rank }) => (
         <p className="text-indigo-400 text-sm">{new Date(item.releaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}</p>
     </div>
 );
-interface CarouselProps { title: string; items: RadarItem[]; onItemClick: (item: RadarItem) => void; isRanked?: boolean; isLoading?: boolean; }
-const Carousel: React.FC<CarouselProps> = ({ title, items, onItemClick, isRanked = false, isLoading = false }) => (
+interface CarouselProps { title: string; items: RadarItem[]; onItemClick: (item: RadarItem) => void; isRanked?: boolean; }
+const Carousel: React.FC<CarouselProps> = ({ title, items, onItemClick, isRanked = false }) => (
     <div className="mb-12">
         <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
-            {isLoading && Array.from({ length: 7 }).map((_, i) => <div key={i} className="flex-shrink-0 w-40 h-60 bg-gray-700 rounded-lg animate-pulse"></div>)}
-            {!isLoading && items.map((item, index) => <CarouselCard key={`${item.id}-${item.listType}`} item={item} onClick={() => onItemClick(item)} rank={isRanked ? index + 1 : undefined} />)}
-            {!isLoading && items.length === 0 && <p className="text-gray-500">Nenhum item nesta categoria por enquanto.</p>}
+            {items.length > 0 ? items.map((item, index) => <CarouselCard key={`${item.id}-${item.listType}`} item={item} onClick={() => onItemClick(item)} rank={isRanked ? index + 1 : undefined} />) : <p className="text-gray-500">A carregar...</p>}
         </div>
     </div>
 );
@@ -76,83 +73,32 @@ const Carousel: React.FC<CarouselProps> = ({ title, items, onItemClick, isRanked
 const RadarView: React.FC = () => {
     const { data: watchedData } = useContext(WatchedDataContext);
     const { addToWatchlist, isInWatchlist } = useContext(WatchlistContext);
-    
-    const [relevantReleases, setRelevantReleases] = useState<RadarItem[]>([]);
-    const [isLoadingRelevants, setIsLoadingRelevants] = useState(true);
-
-    const [quickLists, setQuickLists] = useState<Record<string, RadarItem[]>>({});
-    const [isLoadingQuickLists, setIsLoadingQuickLists] = useState(true);
-
+    const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [allReleases, setAllReleases] = useState<RadarItem[]>([]);
     const [selectedItem, setSelectedItem] = useState<RadarItem | null>(null);
 
-    // EFEITO 1: Busca as listas rápidas da API do TMDb
     useEffect(() => {
-        const fetchQuickLists = async () => {
-            setIsLoadingQuickLists(true);
-            try {
-                const PROVIDER_IDS = { netflix: 8, prime: 119, max: 1899, disney: 337 };
-                const [nowPlaying, trending, topNetflix, topPrime, topMax, topDisney] = await Promise.all([
-                    getNowPlayingMovies(), getTrending(),
-                    getTopRatedOnProvider(PROVIDER_IDS.netflix), getTopRatedOnProvider(PROVIDER_IDS.prime),
-                    getTopRatedOnProvider(PROVIDER_IDS.max), getTopRatedOnProvider(PROVIDER_IDS.disney)
-                ]);
-
-                const toRadarItem = (item: TMDbSearchResult, listType: RadarItem['listType'], providerId?: number): RadarItem | null => {
-                    const releaseDate = item.release_date || item.first_air_date;
-                    if (!releaseDate) return null;
-                    const mediaType = item.media_type || (item.title ? 'movie' : 'tv');
-                    const radarItem: RadarItem = {
-                        id: item.id, tmdbMediaType: mediaType, title: `${item.title || item.name} (${new Date(releaseDate).getFullYear()})`,
-                        releaseDate, type: mediaType, listType, providerId,
-                        posterUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
-                    };
-                    return radarItem;
-                };
-
-                setQuickLists({
-                    nowPlaying: nowPlaying.map(m => toRadarItem(m, 'now_playing')).filter((i): i is RadarItem => !!i),
-                    trending: trending.map(t => toRadarItem(t, 'trending')).filter((i): i is RadarItem => !!i),
-                    topNetflix: topNetflix.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.netflix)).filter((i): i is RadarItem => !!i),
-                    topPrime: topPrime.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.prime)).filter((i): i is RadarItem => !!i),
-                    topMax: topMax.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.max)).filter((i): i is RadarItem => !!i),
-                    topDisney: topDisney.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.disney)).filter((i): i is RadarItem => !!i),
-                });
-
-            } catch (err) {
-                setError(err instanceof Error ? err.message : "Não foi possível carregar as listas principais.");
-            } finally {
-                setIsLoadingQuickLists(false);
-            }
-        };
-
-        fetchQuickLists();
-    }, []); // Executa apenas uma vez, ao montar o componente
-
-    // EFEITO 2: Ouve o Firebase e dispara a atualização em segundo plano
-    useEffect(() => {
-        if (Object.values(watchedData).flat().length === 0) {
-            setIsLoadingRelevants(false);
-            return;
-        }
-
+        // Dispara a atualização em segundo plano, mas não a espera
         updateRelevantReleasesIfNeeded(watchedData).catch(err => {
             console.error("Falha na atualização em segundo plano do Radar:", err);
         });
 
+        // "Ouve" a coleção do Firebase em tempo real
         const unsubscribe = onSnapshot(relevantReleasesCollection, (querySnapshot) => {
             const releases: RadarItem[] = [];
             querySnapshot.forEach((doc) => {
                 releases.push(doc.data() as RadarItem);
             });
-            setRelevantReleases(releases);
-            setIsLoadingRelevants(false);
+            setAllReleases(releases);
+            setIsLoading(false);
         }, (err) => {
             console.error("Erro ao ouvir o Radar:", err);
             setError("Não foi possível carregar os dados do Radar.");
-            setIsLoadingRelevants(false);
+            setIsLoading(false);
         });
 
+        // Limpa o "ouvinte" quando o componente é desmontado
         return () => unsubscribe();
     }, [watchedData]);
     
@@ -168,13 +114,13 @@ const RadarView: React.FC = () => {
         setSelectedItem(null);
     };
     
-    const upcoming = useMemo(() => relevantReleases.filter(r => r.listType === 'upcoming').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [relevantReleases]);
-    const nowPlaying = useMemo(() => quickLists.nowPlaying || [], [quickLists]);
-    const trending = useMemo(() => quickLists.trending || [], [quickLists]);
-    const topNetflix = useMemo(() => quickLists.topNetflix || [], [quickLists]);
-    const topPrime = useMemo(() => quickLists.topPrime || [], [quickLists]);
-    const topMax = useMemo(() => quickLists.topMax || [], [quickLists]);
-    const topDisney = useMemo(() => quickLists.topDisney || [], [quickLists]);
+    const upcoming = useMemo(() => allReleases.filter(r => r.listType === 'upcoming').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [allReleases]);
+    const nowPlaying = useMemo(() => allReleases.filter(r => r.listType === 'now_playing').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [allReleases]);
+    const trending = useMemo(() => allReleases.filter(r => r.listType === 'trending'), [allReleases]);
+    const topNetflix = useMemo(() => allReleases.filter(r => r.providerId === 8), [allReleases]);
+    const topPrime = useMemo(() => allReleases.filter(r => r.providerId === 119), [allReleases]);
+    const topMax = useMemo(() => allReleases.filter(r => r.providerId === 1899), [allReleases]);
+    const topDisney = useMemo(() => allReleases.filter(r => r.providerId === 337), [allReleases]);
 
     return (
         <div className="p-4">
@@ -191,17 +137,20 @@ const RadarView: React.FC = () => {
                 <h1 className="text-4xl font-bold text-white">Radar de Lançamentos</h1>
             </div>
 
+            {isLoading && <p className="text-center text-gray-400">A carregar o seu radar...</p>}
             {error && <p className="text-center text-red-400 bg-red-900/50 p-4 rounded-lg">{error}</p>}
             
-            <div>
-                <Carousel title="Nos Cinemas" items={nowPlaying} onItemClick={setSelectedItem} isLoading={isLoadingQuickLists} />
-                <Carousel title="Tendências da Semana" items={trending} onItemClick={setSelectedItem} isLoading={isLoadingQuickLists} />
-                <Carousel title="Top 10 na Netflix" items={topNetflix} onItemClick={setSelectedItem} isRanked={true} isLoading={isLoadingQuickLists} />
-                <Carousel title="Top 10 no Prime Video" items={topPrime} onItemClick={setSelectedItem} isRanked={true} isLoading={isLoadingQuickLists} />
-                <Carousel title="Top 10 na Max" items={topMax} onItemClick={setSelectedItem} isRanked={true} isLoading={isLoadingQuickLists} />
-                <Carousel title="Top 10 no Disney+" items={topDisney} onItemClick={setSelectedItem} isRanked={true} isLoading={isLoadingQuickLists} />
-                <Carousel title="Relevante para Si (Em Breve)" items={upcoming} onItemClick={setSelectedItem} isLoading={isLoadingRelevants} />
-            </div>
+            {!isLoading && !error && (
+                <div>
+                    <Carousel title="Nos Cinemas" items={nowPlaying} onItemClick={setSelectedItem} />
+                    <Carousel title="Tendências da Semana" items={trending} onItemClick={setSelectedItem} />
+                    <Carousel title="Top 10 na Netflix" items={topNetflix} onItemClick={setSelectedItem} isRanked={true} />
+                    <Carousel title="Top 10 no Prime Video" items={topPrime} onItemClick={setSelectedItem} isRanked={true} />
+                    <Carousel title="Top 10 na Max" items={topMax} onItemClick={setSelectedItem} isRanked={true} />
+                    <Carousel title="Top 10 no Disney+" items={topDisney} onItemClick={setSelectedItem} isRanked={true} />
+                    <Carousel title="Relevante para Si (Em Breve)" items={upcoming} onItemClick={setSelectedItem} />
+                </div>
+            )}
         </div>
     );
 };

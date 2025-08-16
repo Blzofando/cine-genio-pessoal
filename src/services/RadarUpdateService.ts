@@ -1,3 +1,5 @@
+// src/services/RadarUpdateService.ts
+
 import { db } from './firebaseConfig';
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { AllManagedWatchedData, RadarItem, TMDbSearchResult } from '../types';
@@ -55,7 +57,7 @@ const toRadarItem = (item: TMDbSearchResult, listType: RadarItem['listType'], pr
 export const updateRelevantReleasesIfNeeded = async (watchedData: AllManagedWatchedData): Promise<void> => {
     const { daily, weekly } = await shouldUpdate();
     if (!daily && !weekly) {
-        console.log("Radar está atualizado.");
+        console.log("Radar está atualizado. A usar dados em cache.");
         return;
     }
 
