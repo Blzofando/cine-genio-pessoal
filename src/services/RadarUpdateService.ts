@@ -1,9 +1,9 @@
-// src/services/RadarUpdateService.ts (Completo e Corrigido)
+// src/services/RadarUpdateService.ts
 
 import { db } from './firebaseConfig';
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { AllManagedWatchedData, RadarItem, TMDbSearchResult } from '../types';
-import { getUpcomingMovies, getOnTheAirTV, getNowPlayingMovies, getTopRatedOnProvider, getTrending } from './TMDbService';
+import { getUpcomingMovies, getOnTheAirTV, getNowPlayingMovies, getTopRatedOnProvider, getTrending, getTMDbDetails } from './TMDbService';
 import { formatWatchedDataForPrompt, fetchPersonalizedRadar } from './GeminiService';
 import { setRelevantReleases } from './firestoreService';
 
@@ -31,6 +31,7 @@ const shouldUpdate = async (): Promise<boolean> => {
     return false;
 };
 
+// Função auxiliar para converter um resultado do TMDb para o nosso tipo RadarItem
 const toRadarItem = (item: TMDbSearchResult, listType: RadarItem['listType'], providerId?: number): RadarItem | null => {
     const releaseDate = item.release_date || item.first_air_date;
     if (!releaseDate) return null;
@@ -86,6 +87,7 @@ export const updateRelevantReleasesIfNeeded = async (watchedData: AllManagedWatc
         getTopRatedOnProvider(PROVIDER_IDS.disney),
     ]);
 
+    // --- Processamento da lista "Em Breve" com IA (LÓGICA RESTAURADA) ---
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -98,12 +100,13 @@ export const updateRelevantReleasesIfNeeded = async (watchedData: AllManagedWatc
     if (futureContent.length > 0) {
         const releasesForPrompt = futureContent.map(r => `- ${r.title || r.name} (ID: ${r.id}, Tipo: ${r.media_type})`).join('\n');
         const formattedData = formatWatchedDataForPrompt(watchedData);
-        const prompt = `Analise a lista de próximos lançamentos... (prompt completo aqui)`;
+        const prompt = `Analise a lista de próximos lançamentos e séries no ar e selecione até 20 que sejam mais relevantes para o usuário, com base no seu perfil de gosto.\n\n**PERFIL DO USUÁRIO:**\n${formattedData}\n\n**LISTA DE LANÇAMENTOS:**\n${releasesForPrompt}\n\n**Sua Tarefa:**\nRetorne um objeto JSON com uma chave "releases", com os 20 mais promissores.`;
+        
         const aiResult = await fetchPersonalizedRadar(prompt);
+
         relevantUpcomingItems = aiResult.releases
             .map(release => {
                 const original = futureContent.find(r => r.id === release.id);
-                // Adicionamos o 'media_type' aqui também para garantir
                 if (original) {
                     original.media_type = original.media_type || (original.title ? 'movie' : 'tv');
                 }
@@ -112,6 +115,7 @@ export const updateRelevantReleasesIfNeeded = async (watchedData: AllManagedWatc
             .filter((item): item is RadarItem => item !== null);
     }
     
+    // --- Processamento das outras listas ---
     const nowPlayingItems = nowPlayingMovies.map(m => toRadarItem(m, 'now_playing')).filter((item): item is RadarItem => item !== null);
     const trendingItems = trending.map(t => toRadarItem(t, 'trending')).filter((item): item is RadarItem => item !== null);
     const netflixItems = topNetflix.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.netflix)).filter((item): item is RadarItem => item !== null);

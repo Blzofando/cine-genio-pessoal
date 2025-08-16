@@ -1,25 +1,16 @@
-// src/components/RadarView.tsx (Completo e Corrigido)
-
 import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { WatchedDataContext } from '../App';
 import { WatchlistContext } from '../contexts/WatchlistContext';
-import { RadarItem, WatchProvider, WatchlistItem } from '../types';
+import { RadarItem, WatchProvider, WatchlistItem, TMDbSearchResult } from '../types';
 import { getRelevantReleases } from '../services/firestoreService';
 import { updateRelevantReleasesIfNeeded } from '../services/RadarUpdateService';
-import { getTMDbDetails } from '../services/TMDbService';
+import { getTMDbDetails, getNowPlayingMovies, getTopRatedOnProvider, getTrending } from '../services/TMDbService';
 
-// --- Componentes Internos ---
-
+// --- Componentes Internos (Modal, DetailsModal, etc. inalterados) ---
 const Modal = ({ children, onClose }: { children: React.ReactNode, onClose: () => void }) => ( <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={onClose}><div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up" onClick={e => e.stopPropagation()}>{children}</div></div>);
 const WatchProvidersDisplay: React.FC<{ providers: WatchProvider[] }> = ({ providers }) => ( <div className="flex flex-wrap gap-3">{providers.map(p => (<img key={p.provider_id} src={`https://image.tmdb.org/t/p/w92${p.logo_path}`} alt={p.provider_name} title={p.provider_name} className="w-12 h-12 rounded-lg object-cover bg-gray-700"/>))}</div>);
 
-// Modal de Detalhes ATUALIZADO
-interface DetailsModalProps {
-    item: RadarItem;
-    onClose: () => void;
-    onAddToWatchlist: (item: RadarItem) => void;
-    isInWatchlist: boolean;
-}
+interface DetailsModalProps { item: RadarItem; onClose: () => void; onAddToWatchlist: (item: RadarItem) => void; isInWatchlist: boolean; }
 const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatchlist, isInWatchlist }) => {
     const [details, setDetails] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -39,9 +30,7 @@ const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatch
                     <img src={item.posterUrl || 'https://placehold.co/400x600/374151/9ca3af?text=?'} alt={`Pôster de ${item.title}`} className="w-40 h-60 object-cover rounded-lg shadow-md flex-shrink-0 mx-auto sm:mx-0"/>
                     <div className="flex-grow">
                         <h2 className="text-3xl font-bold text-white mb-2">{item.title}</h2>
-                        {isLoading ? (
-                            <div className="h-5 bg-gray-700 rounded animate-pulse w-3/4 mb-4"></div>
-                        ) : (
+                        {isLoading ? <div className="h-5 bg-gray-700 rounded animate-pulse w-3/4 mb-4"></div> : (
                             <div className="flex items-center flex-wrap gap-x-4 gap-y-2 mb-4 text-sm text-gray-400">
                                 <span>{item.type === 'movie' ? 'Filme' : 'Série'}</span>
                                 <span>&bull;</span>
@@ -59,13 +48,11 @@ const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatch
                         )}
                     </div>
                 </div>
-
                 {isLoading ? <div className="h-20 mt-4 bg-gray-700 rounded animate-pulse"></div> : (
                     details?.['watch/providers']?.results?.BR?.flatrate && (
                         <div className="mt-4"><h3 className="text-xl font-semibold text-gray-300 mb-3">Onde Assistir</h3><WatchProvidersDisplay providers={details['watch/providers'].results.BR.flatrate} /></div>
                     )
                 )}
-                
                 <div className="mt-6 pt-6 border-t border-gray-700 flex flex-col sm:flex-row gap-3">
                     <button onClick={() => onAddToWatchlist(item)} disabled={isInWatchlist} className="w-full sm:w-auto flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
                         {isInWatchlist ? 'Já está na Watchlist' : 'Adicionar à Watchlist'}
@@ -77,56 +64,38 @@ const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatch
     );
 };
 
-// ... (Restante do arquivo RadarView.tsx, com os outros componentes e a view principal, permanece o mesmo)
-// Colei o código completo abaixo para garantir.
-
-// Card individual para os carrosséis
-interface CarouselCardProps {
-    item: RadarItem;
-    onClick: () => void;
-    rank?: number;
-}
-const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick, rank }) => {
-    const releaseInfo = item.nextEpisodeToAir
-        ? `Próx. Ep: ${new Date(item.nextEpisodeToAir.air_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`
-        : new Date(item.releaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
-
-    return (
-        <div onClick={onClick} className="flex-shrink-0 w-40 cursor-pointer group">
-            <div className="relative overflow-hidden rounded-lg shadow-lg">
-                {rank && (
-                    <div className="absolute -left-1 -top-1 z-10">
-                        <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M0 0 H 60 L 0 60 V 0 Z" fill="#111827" fillOpacity="0.7"/>
-                            <text x="10" y="25" fontFamily="Arial, sans-serif" fontSize="20" fontWeight="bold" fill="white">{rank}</text>
-                        </svg>
-                    </div>
-                )}
-                <img src={item.posterUrl || 'https://placehold.co/400x600/374151/9ca3af?text=?'} alt={`Pôster de ${item.title}`} className="w-full h-60 object-cover transition-transform duration-300 group-hover:scale-105"/>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
-            </div>
-            <h3 className="text-white font-bold mt-2 truncate">{item.title}</h3>
-            <p className="text-indigo-400 text-sm">{releaseInfo}</p>
+interface CarouselCardProps { item: RadarItem; onClick: () => void; rank?: number; }
+const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick, rank }) => (
+    <div onClick={onClick} className="flex-shrink-0 w-40 cursor-pointer group">
+        <div className="relative overflow-hidden rounded-lg shadow-lg">
+            {rank && (
+                <div className="absolute -left-1 -top-1 z-10">
+                    <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M0 0 H 60 L 0 60 V 0 Z" fill="#111827" fillOpacity="0.7"/>
+                        <text x="10" y="25" fontFamily="Arial, sans-serif" fontSize="20" fontWeight="bold" fill="white">{rank}</text>
+                    </svg>
+                </div>
+            )}
+            <img src={item.posterUrl || 'https://placehold.co/400x600/374151/9ca3af?text=?'} alt={`Pôster de ${item.title}`} className="w-full h-60 object-cover transition-transform duration-300 group-hover:scale-105"/>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
         </div>
-    );
-};
+        <h3 className="text-white font-bold mt-2 truncate">{item.title}</h3>
+        <p className="text-indigo-400 text-sm">{new Date(item.releaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}</p>
+    </div>
+);
 
-// Carrossel Horizontal
-interface CarouselProps {
-    title: string;
-    items: RadarItem[];
-    onItemClick: (item: RadarItem) => void;
-    isRanked?: boolean;
-}
-const Carousel: React.FC<CarouselProps> = ({ title, items, onItemClick, isRanked = false }) => (
+interface CarouselProps { title: string; items: RadarItem[]; onItemClick: (item: RadarItem) => void; isRanked?: boolean; isLoading?: boolean; }
+const Carousel: React.FC<CarouselProps> = ({ title, items, onItemClick, isRanked = false, isLoading = false }) => (
     <div className="mb-12">
         <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
-            {items.map((item, index) => <CarouselCard key={`${item.id}-${item.listType}`} item={item} onClick={() => onItemClick(item)} rank={isRanked ? index + 1 : undefined} />)}
-            {items.length === 0 && <p className="text-gray-500">Nenhum item nesta categoria por enquanto.</p>}
+            {isLoading && Array.from({ length: 5 }).map((_, i) => <div key={i} className="flex-shrink-0 w-40 h-60 bg-gray-700 rounded-lg animate-pulse"></div>)}
+            {!isLoading && items.map((item, index) => <CarouselCard key={`${item.id}-${item.listType}`} item={item} onClick={() => onItemClick(item)} rank={isRanked ? index + 1 : undefined} />)}
+            {!isLoading && items.length === 0 && <p className="text-gray-500">Nenhum item nesta categoria por enquanto.</p>}
         </div>
     </div>
 );
+
 
 const RadarView: React.FC = () => {
     const { data: watchedData } = useContext(WatchedDataContext);
@@ -134,29 +103,73 @@ const RadarView: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [statusText, setStatusText] = useState("A carregar o seu radar...");
     const [error, setError] = useState<string | null>(null);
+    
+    // Estado para os dados persistidos do Firebase
     const [relevantReleases, setRelevantReleases] = useState<RadarItem[]>([]);
+    // Estado para os dados rápidos da API
+    const [quickLists, setQuickLists] = useState<RadarItem[]>([]);
+
     const [selectedItem, setSelectedItem] = useState<RadarItem | null>(null);
 
     useEffect(() => {
         const initializeRadar = async () => {
             setIsLoading(true);
             setError(null);
+            
+            // --- CARREGAMENTO EM DUAS FASES ---
+
+            // FASE 1: Busca rápida das listas não-IA
             try {
-                setStatusText("A verificar se há novidades...");
+                setStatusText("A buscar novidades...");
+                const PROVIDER_IDS = { netflix: 8, prime: 119, max: 1899, disney: 337 };
+                const [nowPlaying, trending, topNetflix, topPrime, topMax, topDisney] = await Promise.all([
+                    getNowPlayingMovies(), getTrending(),
+                    getTopRatedOnProvider(PROVIDER_IDS.netflix), getTopRatedOnProvider(PROVIDER_IDS.prime),
+                    getTopRatedOnProvider(PROVIDER_IDS.max), getTopRatedOnProvider(PROVIDER_IDS.disney)
+                ]);
+
+                const toRadarItem = (item: TMDbSearchResult, listType: RadarItem['listType'], providerId?: number): RadarItem | null => {
+                    const releaseDate = item.release_date || item.first_air_date;
+                    if (!releaseDate) return null;
+                    const mediaType = item.media_type || (item.title ? 'movie' : 'tv');
+                    const radarItem: RadarItem = {
+                        id: item.id, tmdbMediaType: mediaType, title: `${item.title || item.name} (${new Date(releaseDate).getFullYear()})`,
+                        releaseDate, type: mediaType, listType, providerId,
+                        posterUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
+                    };
+                    return radarItem;
+                };
+
+                const quickItems = [
+                    ...nowPlaying.map(m => toRadarItem(m, 'now_playing')),
+                    ...trending.map(t => toRadarItem(t, 'trending')),
+                    ...topNetflix.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.netflix)),
+                    ...topPrime.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.prime)),
+                    ...topMax.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.max)),
+                    ...topDisney.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.disney)),
+                ].filter((item): item is RadarItem => item !== null);
+                
+                setQuickLists(quickItems);
+                setIsLoading(false); // Libera a UI principal
+
+            } catch (err) {
+                setError(err instanceof Error ? err.message : "Não foi possível carregar as listas principais.");
+                setIsLoading(false);
+            }
+
+            // FASE 2: Atualização completa em segundo plano e busca dos dados do Firebase
+            try {
                 await updateRelevantReleasesIfNeeded(watchedData);
-                setStatusText("A carregar lançamentos...");
                 const releases = await getRelevantReleases();
                 setRelevantReleases(releases);
             } catch (err) {
-                setError(err instanceof Error ? err.message : "Não foi possível carregar o Radar.");
-                console.error(err);
-            } finally {
-                setIsLoading(false);
+                console.error("Falha na atualização em segundo plano do Radar:", err);
             }
         };
+
         if (Object.values(watchedData).flat().length > 0) {
             initializeRadar();
-        } else if (!isLoading) {
+        } else {
              setIsLoading(false);
              setStatusText("Adicione itens à sua coleção para que o Gênio possa gerar seu radar.");
         }
@@ -174,13 +187,16 @@ const RadarView: React.FC = () => {
         setSelectedItem(null);
     };
     
-    const upcoming = useMemo(() => relevantReleases.filter(r => r.listType === 'upcoming').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [relevantReleases]);
-    const nowPlaying = useMemo(() => relevantReleases.filter(r => r.listType === 'now_playing').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [relevantReleases]);
-    const trending = useMemo(() => relevantReleases.filter(r => r.listType === 'trending'), [relevantReleases]);
-    const topNetflix = useMemo(() => relevantReleases.filter(r => r.providerId === 8), [relevantReleases]);
-    const topPrime = useMemo(() => relevantReleases.filter(r => r.providerId === 119), [relevantReleases]);
-    const topMax = useMemo(() => relevantReleases.filter(r => r.providerId === 1899), [relevantReleases]);
-    const topDisney = useMemo(() => relevantReleases.filter(r => r.providerId === 337), [relevantReleases]);
+    // Usa os dados rápidos se disponíveis, senão os do Firebase
+    const displayItems = relevantReleases.length > 0 ? relevantReleases : quickLists;
+
+    const upcoming = useMemo(() => displayItems.filter(r => r.listType === 'upcoming').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [displayItems]);
+    const nowPlaying = useMemo(() => displayItems.filter(r => r.listType === 'now_playing').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [displayItems]);
+    const trending = useMemo(() => displayItems.filter(r => r.listType === 'trending'), [displayItems]);
+    const topNetflix = useMemo(() => displayItems.filter(r => r.providerId === 8), [displayItems]);
+    const topPrime = useMemo(() => displayItems.filter(r => r.providerId === 119), [displayItems]);
+    const topMax = useMemo(() => displayItems.filter(r => r.providerId === 1899), [displayItems]);
+    const topDisney = useMemo(() => displayItems.filter(r => r.providerId === 337), [displayItems]);
 
     return (
         <div className="p-4">
@@ -197,9 +213,10 @@ const RadarView: React.FC = () => {
                 <h1 className="text-4xl font-bold text-white">Radar de Lançamentos</h1>
             </div>
 
-            {isLoading && <p className="text-center text-gray-400">{statusText}</p>}
             {error && <p className="text-center text-red-400 bg-red-900/50 p-4 rounded-lg">{error}</p>}
             
+            {isLoading && <p className="text-center text-gray-400">{statusText}</p>}
+
             {!isLoading && !error && (
                 <div>
                     <Carousel title="Nos Cinemas" items={nowPlaying} onItemClick={setSelectedItem} />
@@ -208,7 +225,7 @@ const RadarView: React.FC = () => {
                     <Carousel title="Top 10 no Prime Video" items={topPrime} onItemClick={setSelectedItem} isRanked={true} />
                     <Carousel title="Top 10 na Max" items={topMax} onItemClick={setSelectedItem} isRanked={true} />
                     <Carousel title="Top 10 no Disney+" items={topDisney} onItemClick={setSelectedItem} isRanked={true} />
-                    <Carousel title="Relevante para Si (Em Breve)" items={upcoming} onItemClick={setSelectedItem} />
+                    <Carousel title="Relevante para Si (Em Breve)" items={upcoming} onItemClick={setSelectedItem} isLoading={relevantReleases.length === 0} />
                 </div>
             )}
         </div>
