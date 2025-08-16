@@ -6,7 +6,7 @@ import { getRelevantReleases } from '../services/firestoreService';
 import { updateRelevantReleasesIfNeeded } from '../services/RadarUpdateService';
 import { getTMDbDetails, getNowPlayingMovies, getTopRatedOnProvider, getTrending } from '../services/TMDbService';
 
-// --- Componentes Internos (Modal, DetailsModal, etc. inalterados) ---
+// --- Componentes Internos ---
 const Modal = ({ children, onClose }: { children: React.ReactNode, onClose: () => void }) => ( <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={onClose}><div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up" onClick={e => e.stopPropagation()}>{children}</div></div>);
 const WatchProvidersDisplay: React.FC<{ providers: WatchProvider[] }> = ({ providers }) => ( <div className="flex flex-wrap gap-3">{providers.map(p => (<img key={p.provider_id} src={`https://image.tmdb.org/t/p/w92${p.logo_path}`} alt={p.provider_name} title={p.provider_name} className="w-12 h-12 rounded-lg object-cover bg-gray-700"/>))}</div>);
 
@@ -94,11 +94,9 @@ const RadarView: React.FC = () => {
     const { data: watchedData } = useContext(WatchedDataContext);
     const { addToWatchlist, isInWatchlist } = useContext(WatchlistContext);
     
-    // Estado para os dados persistidos do Firebase (lentos)
     const [relevantReleases, setRelevantReleases] = useState<RadarItem[]>([]);
     const [isLoadingRelevants, setIsLoadingRelevants] = useState(true);
 
-    // Estado para os dados rápidos da API do TMDb
     const [quickLists, setQuickLists] = useState<Record<string, RadarItem[]>>({});
     const [isLoadingQuickLists, setIsLoadingQuickLists] = useState(true);
 
@@ -154,7 +152,6 @@ const RadarView: React.FC = () => {
                 setRelevantReleases(releases);
             } catch (err) {
                 console.error("Falha na atualização em segundo plano do Radar:", err);
-                // Não mostra erro na tela principal para não atrapalhar
             } finally {
                 setIsLoadingRelevants(false);
             }
@@ -181,6 +178,12 @@ const RadarView: React.FC = () => {
     };
     
     const upcoming = useMemo(() => relevantReleases.filter(r => r.listType === 'upcoming').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [relevantReleases]);
+    const nowPlaying = useMemo(() => quickLists.nowPlaying || [], [quickLists]);
+    const trending = useMemo(() => quickLists.trending || [], [quickLists]);
+    const topNetflix = useMemo(() => quickLists.topNetflix || [], [quickLists]);
+    const topPrime = useMemo(() => quickLists.topPrime || [], [quickLists]);
+    const topMax = useMemo(() => quickLists.topMax || [], [quickLists]);
+    const topDisney = useMemo(() => quickLists.topDisney || [], [quickLists]);
 
     return (
         <div className="p-4">
@@ -200,12 +203,12 @@ const RadarView: React.FC = () => {
             {error && <p className="text-center text-red-400 bg-red-900/50 p-4 rounded-lg">{error}</p>}
             
             <div>
-                <Carousel title="Nos Cinemas" items={quickLists.nowPlaying || []} onItemClick={setSelectedItem} isLoading={isLoadingQuickLists} />
-                <Carousel title="Tendências da Semana" items={quickLists.trending || []} onItemClick={setSelectedItem} isLoading={isLoadingQuickLists} />
-                <Carousel title="Top 10 na Netflix" items={quickLists.topNetflix || []} onItemClick={setSelectedItem} isRanked={true} isLoading={isLoadingQuickLists} />
-                <Carousel title="Top 10 no Prime Video" items={quickLists.topPrime || []} onItemClick={setSelectedItem} isRanked={true} isLoading={isLoadingQuickLists} />
-                <Carousel title="Top 10 na Max" items={quickLists.topMax || []} onItemClick={setSelectedItem} isRanked={true} isLoading={isLoadingQuickLists} />
-                <Carousel title="Top 10 no Disney+" items={quickLists.topDisney || []} onItemClick={setSelectedItem} isRanked={true} isLoading={isLoadingQuickLists} />
+                <Carousel title="Nos Cinemas" items={nowPlaying} onItemClick={setSelectedItem} isLoading={isLoadingQuickLists} />
+                <Carousel title="Tendências da Semana" items={trending} onItemClick={setSelectedItem} isLoading={isLoadingQuickLists} />
+                <Carousel title="Top 10 na Netflix" items={topNetflix} onItemClick={setSelectedItem} isRanked={true} isLoading={isLoadingQuickLists} />
+                <Carousel title="Top 10 no Prime Video" items={topPrime} onItemClick={setSelectedItem} isRanked={true} isLoading={isLoadingQuickLists} />
+                <Carousel title="Top 10 na Max" items={topMax} onItemClick={setSelectedItem} isRanked={true} isLoading={isLoadingQuickLists} />
+                <Carousel title="Top 10 no Disney+" items={topDisney} onItemClick={setSelectedItem} isRanked={true} isLoading={isLoadingQuickLists} />
                 <Carousel title="Relevante para Si (Em Breve)" items={upcoming} onItemClick={setSelectedItem} isLoading={isLoadingRelevants} />
             </div>
         </div>
