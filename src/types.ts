@@ -1,4 +1,4 @@
-// src/types.ts (Completo)
+// src/types.ts
 
 export type MediaType = 'Filme' | 'Série' | 'Anime' | 'Programa';
 export type Rating = 'amei' | 'gostei' | 'meh' | 'naoGostei';
@@ -66,6 +66,12 @@ export interface RadarItem {
     releaseDate: string;
     type: 'movie' | 'tv';
     listType: 'upcoming' | 'now_playing' | 'top_rated_provider' | 'trending'; 
+    providerId?: number;
+    nextEpisodeToAir?: {
+        air_date: string;
+        episode_number: number;
+        season_number: number;
+    };
 }
 
 export type AllManagedWatchedData = {

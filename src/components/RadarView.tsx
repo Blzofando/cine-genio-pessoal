@@ -1,4 +1,4 @@
-// src/components/RadarView.tsx (Completo)
+// src/components/RadarView.tsx
 
 import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { WatchedDataContext } from '../App';
@@ -36,13 +36,11 @@ const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatch
         <Modal onClose={onClose}>
             <div className="p-6">
                 <div className="flex flex-col sm:flex-row gap-6">
-                    {/* Pôster Adicionado ao Modal */}
                     <img src={item.posterUrl || 'https://placehold.co/400x600/374151/9ca3af?text=?'} alt={`Pôster de ${item.title}`} className="w-40 h-60 object-cover rounded-lg shadow-md flex-shrink-0 mx-auto sm:mx-0"/>
                     <div className="flex-grow">
                         <h2 className="text-3xl font-bold text-white mb-2">{item.title}</h2>
                         {isLoading ? <div className="h-10 bg-gray-700 rounded animate-pulse w-3/4 mb-4"></div> : (
                             <div className="flex items-center flex-wrap gap-x-4 gap-y-2 mb-4 text-sm text-gray-400">
-                                {/* Categoria e Gênero Corrigidos */}
                                 <span>{item.type === 'movie' ? 'Filme' : 'Série'}</span>
                                 <span>&bull;</span>
                                 <span>{details?.genres?.[0]?.name || 'N/A'}</span>
@@ -53,13 +51,11 @@ const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatch
                         )}
                     </div>
                 </div>
-
                 {isLoading ? <div className="h-20 mt-4 bg-gray-700 rounded animate-pulse"></div> : (
                     details?.['watch/providers']?.results?.BR?.flatrate && (
                         <div className="mt-4"><h3 className="text-xl font-semibold text-gray-300 mb-3">Onde Assistir</h3><WatchProvidersDisplay providers={details['watch/providers'].results.BR.flatrate} /></div>
                     )
                 )}
-                
                 <div className="mt-6 pt-6 border-t border-gray-700 flex flex-col sm:flex-row gap-3">
                     <button onClick={() => onAddToWatchlist(item)} disabled={isInWatchlist} className="w-full sm:w-auto flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
                         {isInWatchlist ? 'Já está na Watchlist' : 'Adicionar à Watchlist'}
@@ -75,11 +71,10 @@ const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatch
 interface CarouselCardProps {
     item: RadarItem;
     onClick: () => void;
-    rank?: number; // Opcional: para o número do Top 10
+    rank?: number;
 }
 const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick, rank }) => {
-    // Lógica para exibir a data do próximo episódio, se disponível
-    const releaseInfo = item.type === 'tv' && item.nextEpisodeToAir
+    const releaseInfo = item.nextEpisodeToAir
         ? `Próx. Ep: ${new Date(item.nextEpisodeToAir.air_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`
         : new Date(item.releaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
@@ -87,8 +82,11 @@ const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick, rank }) => {
         <div onClick={onClick} className="flex-shrink-0 w-40 cursor-pointer group">
             <div className="relative overflow-hidden rounded-lg shadow-lg">
                 {rank && (
-                    <div className="absolute top-0 left-0 z-10 w-10 h-10 bg-black/50 backdrop-blur-sm rounded-br-lg flex items-center justify-center">
-                        <span className="text-xl font-bold text-white">{rank}</span>
+                    <div className="absolute -left-1 -top-1 z-10">
+                        <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M0 0 H 60 L 0 60 V 0 Z" fill="#111827" fillOpacity="0.7"/>
+                            <text x="10" y="25" fontFamily="Arial, sans-serif" fontSize="20" fontWeight="bold" fill="white">{rank}</text>
+                        </svg>
                     </div>
                 )}
                 <img src={item.posterUrl || 'https://placehold.co/400x600/374151/9ca3af?text=?'} alt={`Pôster de ${item.title}`} className="w-full h-60 object-cover transition-transform duration-300 group-hover:scale-105"/>
@@ -100,13 +98,12 @@ const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick, rank }) => {
     );
 };
 
-
 // Carrossel Horizontal
 interface CarouselProps {
     title: string;
     items: RadarItem[];
     onItemClick: (item: RadarItem) => void;
-    isRanked?: boolean; // Opcional: para saber se é um Top 10
+    isRanked?: boolean;
 }
 const Carousel: React.FC<CarouselProps> = ({ title, items, onItemClick, isRanked = false }) => (
     <div className="mb-12">
@@ -135,11 +132,9 @@ const RadarView: React.FC = () => {
             try {
                 setStatusText("A verificar se há novidades...");
                 await updateRelevantReleasesIfNeeded(watchedData);
-
                 setStatusText("A carregar lançamentos...");
                 const releases = await getRelevantReleases();
                 setRelevantReleases(releases);
-
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Não foi possível carregar o Radar.");
                 console.error(err);
@@ -147,7 +142,6 @@ const RadarView: React.FC = () => {
                 setIsLoading(false);
             }
         };
-
         if (Object.values(watchedData).flat().length > 0) {
             initializeRadar();
         } else if (!isLoading) {
@@ -168,14 +162,13 @@ const RadarView: React.FC = () => {
         setSelectedItem(null);
     };
     
-    // Filtra os itens por listType para cada carrossel
     const upcoming = useMemo(() => relevantReleases.filter(r => r.listType === 'upcoming').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [relevantReleases]);
     const nowPlaying = useMemo(() => relevantReleases.filter(r => r.listType === 'now_playing').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [relevantReleases]);
     const trending = useMemo(() => relevantReleases.filter(r => r.listType === 'trending'), [relevantReleases]);
-    const topNetflix = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.id in PROVIDER_MAP.netflix), [relevantReleases]);
-    const topPrime = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.id in PROVIDER_MAP.prime), [relevantReleases]);
-    const topMax = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.id in PROVIDER_MAP.max), [relevantReleases]);
-    const topDisney = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.id in PROVIDER_MAP.disney), [relevantReleases]);
+    const topNetflix = useMemo(() => relevantReleases.filter(r => r.providerId === 8), [relevantReleases]);
+    const topPrime = useMemo(() => relevantReleases.filter(r => r.providerId === 119), [relevantReleases]);
+    const topMax = useMemo(() => relevantReleases.filter(r => r.providerId === 1899), [relevantReleases]);
+    const topDisney = useMemo(() => relevantReleases.filter(r => r.providerId === 337), [relevantReleases]);
 
     return (
         <div className="p-4">
@@ -209,19 +202,5 @@ const RadarView: React.FC = () => {
         </div>
     );
 };
-
-// Mapa de IDs para ajudar a filtrar os Top 10 (necessário porque a API não retorna o provider no discover)
-const PROVIDER_MAP = {
-    netflix: {},
-    prime: {},
-    max: {},
-    disney: {}
-};
-
-// Preenche o mapa - esta é uma solução de contorno; o ideal seria ter o ID do provider no item
-(async () => {
-    // Esta é uma lógica complexa que precisaria ser executada no serviço de atualização
-})();
-
 
 export default RadarView;
