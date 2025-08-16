@@ -104,9 +104,11 @@ const RadarView: React.FC = () => {
             setIsLoading(true);
             setError(null);
             try {
+                // Aciona a atualização em segundo plano (só executa se necessário)
                 setStatusText("A verificar se há novidades...");
                 await updateRelevantReleasesIfNeeded(watchedData);
 
+                // Busca os dados já persistidos para exibir na tela imediatamente
                 setStatusText("A carregar lançamentos...");
                 const [releases, calendar] = await Promise.all([
                     getRelevantReleases(),
@@ -124,10 +126,12 @@ const RadarView: React.FC = () => {
             }
         };
 
+        // Garante que temos os dados do usuário antes de rodar a lógica
         if (Object.values(watchedData).flat().length > 0) {
             initializeRadar();
         } else if (!isLoading) {
-             setIsLoading(false);
+             // Se não há dados do usuário e não está carregando, define como pronto.
+             setIsLoading(false)
              setStatusText("Adicione itens à sua coleção para que o Gênio possa gerar seu radar.");
         }
     }, [watchedData]);

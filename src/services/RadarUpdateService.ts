@@ -41,8 +41,6 @@ export const updateRelevantReleasesIfNeeded = async (watchedData: AllManagedWatc
 
     const [movies, tvShows] = await Promise.all([getUpcomingMovies(), getOnTheAirTV()]);
 
-    // ### CORREÇÃO AQUI ###
-    // Adicionamos manualmente o campo 'media_type' a cada item para garantir que ele exista.
     const allReleases = [
         ...movies.map(m => ({ ...m, media_type: 'movie' as const })),
         ...tvShows.map(t => ({ ...t, media_type: 'tv' as const }))
@@ -64,18 +62,26 @@ Retorne um objeto JSON contendo uma chave "releases", que é um array com os 20 
 
     const result = await fetchPersonalizedRadar(prompt);
     
+    // ### CORREÇÃO AQUI ###
+    // A lógica para criar os itens foi ajustada para evitar o 'undefined' no posterUrl
     const enrichedReleases: RadarItem[] = result.releases.map(release => {
         const originalRelease = allReleases.find(r => r.id === release.id);
         if (!originalRelease) return null;
 
-        return {
+        const radarItem: RadarItem = {
             id: release.id,
             tmdbMediaType: release.tmdbMediaType,
             title: originalRelease.title || originalRelease.name || 'Título Desconhecido',
-            posterUrl: originalRelease.poster_path ? `https://image.tmdb.org/t/p/w500${originalRelease.poster_path}` : undefined,
             releaseDate: originalRelease.release_date || originalRelease.first_air_date || 'Em breve',
-            type: originalRelease.media_type, // Agora este campo nunca será 'undefined'
+            type: originalRelease.media_type,
         };
+
+        // Adiciona o posterUrl apenas se ele existir
+        if (originalRelease.poster_path) {
+            radarItem.posterUrl = `https://image.tmdb.org/t/p/w500${originalRelease.poster_path}`;
+        }
+
+        return radarItem;
     }).filter(Boolean) as RadarItem[];
 
     await setRelevantReleases(enrichedReleases);
