@@ -1,4 +1,4 @@
-// src/components/RadarView.tsx
+// src/components/RadarView.tsx (Completo e Corrigido)
 
 import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { WatchedDataContext } from '../App';
@@ -39,23 +39,33 @@ const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatch
                     <img src={item.posterUrl || 'https://placehold.co/400x600/374151/9ca3af?text=?'} alt={`Pôster de ${item.title}`} className="w-40 h-60 object-cover rounded-lg shadow-md flex-shrink-0 mx-auto sm:mx-0"/>
                     <div className="flex-grow">
                         <h2 className="text-3xl font-bold text-white mb-2">{item.title}</h2>
-                        {isLoading ? <div className="h-10 bg-gray-700 rounded animate-pulse w-3/4 mb-4"></div> : (
+                        {isLoading ? (
+                            <div className="h-5 bg-gray-700 rounded animate-pulse w-3/4 mb-4"></div>
+                        ) : (
                             <div className="flex items-center flex-wrap gap-x-4 gap-y-2 mb-4 text-sm text-gray-400">
                                 <span>{item.type === 'movie' ? 'Filme' : 'Série'}</span>
                                 <span>&bull;</span>
                                 <span>{details?.genres?.[0]?.name || 'N/A'}</span>
                             </div>
                         )}
-                        {isLoading ? <div className="h-24 bg-gray-700 rounded animate-pulse"></div> : (
+                        {isLoading ? (
+                            <div className="space-y-2 mt-4">
+                                <div className="h-4 bg-gray-700 rounded animate-pulse w-full"></div>
+                                <div className="h-4 bg-gray-700 rounded animate-pulse w-full"></div>
+                                <div className="h-4 bg-gray-700 rounded animate-pulse w-5/6"></div>
+                            </div>
+                        ) : (
                             <p className="text-gray-300 text-sm mb-4">{details?.overview || "Sinopse não disponível."}</p>
                         )}
                     </div>
                 </div>
+
                 {isLoading ? <div className="h-20 mt-4 bg-gray-700 rounded animate-pulse"></div> : (
                     details?.['watch/providers']?.results?.BR?.flatrate && (
                         <div className="mt-4"><h3 className="text-xl font-semibold text-gray-300 mb-3">Onde Assistir</h3><WatchProvidersDisplay providers={details['watch/providers'].results.BR.flatrate} /></div>
                     )
                 )}
+                
                 <div className="mt-6 pt-6 border-t border-gray-700 flex flex-col sm:flex-row gap-3">
                     <button onClick={() => onAddToWatchlist(item)} disabled={isInWatchlist} className="w-full sm:w-auto flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
                         {isInWatchlist ? 'Já está na Watchlist' : 'Adicionar à Watchlist'}
@@ -66,6 +76,9 @@ const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatch
         </Modal>
     );
 };
+
+// ... (Restante do arquivo RadarView.tsx, com os outros componentes e a view principal, permanece o mesmo)
+// Colei o código completo abaixo para garantir.
 
 // Card individual para os carrosséis
 interface CarouselCardProps {
@@ -114,7 +127,6 @@ const Carousel: React.FC<CarouselProps> = ({ title, items, onItemClick, isRanked
         </div>
     </div>
 );
-
 
 const RadarView: React.FC = () => {
     const { data: watchedData } = useContext(WatchedDataContext);
