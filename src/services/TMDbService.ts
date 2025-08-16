@@ -3,7 +3,7 @@ import { WatchProviders, TMDbSearchResult } from "../types";
 const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const BASE_URL = 'https://api.themoviedb.org/3';
 
-// Lógica de fila de requisições para evitar sobrecarga na API (inalterada)
+// Lógica de fila de requisições para evitar sobrecarga na API
 const requestQueue: (() => Promise<any>)[] = [];
 let isProcessing = false;
 const DELAY_BETWEEN_REQUESTS = 250;
@@ -70,7 +70,6 @@ const internalGetOnTheAirTV = async (): Promise<TMDbSearchResult[]> => {
     return data.results || [];
 };
 
-// --- NOVAS FUNÇÕES INTERNAS ---
 const internalGetNowPlayingMovies = async (): Promise<TMDbSearchResult[]> => {
     const url = `${BASE_URL}/movie/now_playing?language=pt-BR&page=1&region=BR&api_key=${API_KEY}`;
     const response = await fetch(url);
@@ -87,12 +86,24 @@ const internalGetTopRatedOnProvider = async (providerId: number): Promise<TMDbSe
     return data.results?.slice(0, 10) || [];
 };
 
+const internalGetTrending = async (): Promise<TMDbSearchResult[]> => {
+    const url = `${BASE_URL}/trending/all/week?language=pt-BR&api_key=${API_KEY}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Falha ao buscar tendências: ${response.status}`);
+    const data = await response.json();
+    return data.results || [];
+};
+
 
 // --- Funções Exportadas ---
 
-export const searchTMDb = (query: string) => addToQueue(() => internalSearchTMDb(query));
+export const searchTMDb = (query: string) => { 
+    return addToQueue(() => internalSearchTMDb(query)); 
+};
 
-export const getTMDbDetails = (id: number, mediaType: 'movie' | 'tv') => addToQueue(() => internalGetTMDbDetails(id, mediaType));
+export const getTMDbDetails = (id: number, mediaType: 'movie' | 'tv') => {
+    return addToQueue(() => internalGetTMDbDetails(id, mediaType));
+};
 
 export const getProviders = (data: any): WatchProviders | undefined => {
     const providers = data?.['watch/providers']?.results?.BR;
@@ -117,9 +128,22 @@ export const fetchPosterUrl = async (title: string): Promise<string | null> => {
     }
 };
 
-export const getUpcomingMovies = () => addToQueue(() => internalGetUpcomingMovies());
-export const getOnTheAirTV = () => addToQueue(() => internalGetOnTheAirTV());
+export const getUpcomingMovies = () => {
+    return addToQueue(() => internalGetUpcomingMovies());
+};
 
-// --- NOVAS FUNÇÕES EXPORTADAS ---
-export const getNowPlayingMovies = () => addToQueue(() => internalGetNowPlayingMovies());
-export const getTopRatedOnProvider = (id: number) => addToQueue(() => internalGetTopRatedOnProvider(id));
+export const getOnTheAirTV = () => {
+    return addToQueue(() => internalGetOnTheAirTV());
+};
+
+export const getNowPlayingMovies = () => {
+    return addToQueue(() => internalGetNowPlayingMovies());
+};
+
+export const getTopRatedOnProvider = (id: number) => {
+    return addToQueue(() => internalGetTopRatedOnProvider(id));
+};
+
+export const getTrending = () => {
+    return addToQueue(() => internalGetTrending());
+};

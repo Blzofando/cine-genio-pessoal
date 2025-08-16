@@ -1,4 +1,4 @@
-// src/services/firestoreService.ts (Completo e Simplificado)
+// src/services/firestoreService.ts
 
 import { db } from './firebaseConfig';
 import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc, writeBatch } from "firebase/firestore";
@@ -51,7 +51,7 @@ export const updateWatchlistItem = async (id: number, dataToUpdate: Partial<Watc
 };
 
 
-// --- RADAR DE LANÇAMENTOS RELEVANTES ---
+// --- COLEÇÃO DO RADAR DE LANÇAMENTOS ---
 const RELEASES_COLLECTION_NAME = 'relevantReleases';
 
 export const getRelevantReleases = async (): Promise<RadarItem[]> => {
@@ -84,4 +84,9 @@ export const getChallengesHistory = async (): Promise<Challenge[]> => {
     const items: Challenge[] = [];
     querySnapshot.forEach((doc) => { items.push(doc.data() as Challenge); });
     return items;
+};
+
+export const updateChallenge = async (challenge: Challenge): Promise<void> => {
+    const challengeRef = doc(db, CHALLENGES_COLLECTION_NAME, challenge.id);
+    await setDoc(challengeRef, challenge, { merge: true });
 };

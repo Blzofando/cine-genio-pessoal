@@ -35,23 +35,31 @@ const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatch
     return (
         <Modal onClose={onClose}>
             <div className="p-6">
-                <h2 className="text-3xl font-bold text-white mb-2">{item.title}</h2>
-                {isLoading ? <div className="h-10 bg-gray-700 rounded animate-pulse w-3/4 mb-4"></div> : (
-                    <div className="flex items-center flex-wrap gap-x-4 gap-y-2 mb-4 text-sm text-gray-400">
-                        <span>{details?.media_type === 'movie' ? 'Filme' : 'Série'}</span>
-                        <span>&bull;</span>
-                        <span>{details?.genres?.[0]?.name || 'N/A'}</span>
-                    </div>
-                )}
-
-                {isLoading ? <div className="h-24 bg-gray-700 rounded animate-pulse"></div> : (
-                    <div>
-                        <p className="text-gray-300 text-sm mb-4">{details?.overview || "Sinopse não disponível."}</p>
-                        {details?.['watch/providers']?.results?.BR?.flatrate && (
-                            <div className="mb-4"><h3 className="text-xl font-semibold text-gray-300 mb-3">Onde Assistir</h3><WatchProvidersDisplay providers={details['watch/providers'].results.BR.flatrate} /></div>
+                <div className="flex flex-col sm:flex-row gap-6">
+                    {/* Pôster Adicionado ao Modal */}
+                    <img src={item.posterUrl || 'https://placehold.co/400x600/374151/9ca3af?text=?'} alt={`Pôster de ${item.title}`} className="w-40 h-60 object-cover rounded-lg shadow-md flex-shrink-0 mx-auto sm:mx-0"/>
+                    <div className="flex-grow">
+                        <h2 className="text-3xl font-bold text-white mb-2">{item.title}</h2>
+                        {isLoading ? <div className="h-10 bg-gray-700 rounded animate-pulse w-3/4 mb-4"></div> : (
+                            <div className="flex items-center flex-wrap gap-x-4 gap-y-2 mb-4 text-sm text-gray-400">
+                                {/* Categoria e Gênero Corrigidos */}
+                                <span>{item.type === 'movie' ? 'Filme' : 'Série'}</span>
+                                <span>&bull;</span>
+                                <span>{details?.genres?.[0]?.name || 'N/A'}</span>
+                            </div>
+                        )}
+                        {isLoading ? <div className="h-24 bg-gray-700 rounded animate-pulse"></div> : (
+                            <p className="text-gray-300 text-sm mb-4">{details?.overview || "Sinopse não disponível."}</p>
                         )}
                     </div>
+                </div>
+
+                {isLoading ? <div className="h-20 mt-4 bg-gray-700 rounded animate-pulse"></div> : (
+                    details?.['watch/providers']?.results?.BR?.flatrate && (
+                        <div className="mt-4"><h3 className="text-xl font-semibold text-gray-300 mb-3">Onde Assistir</h3><WatchProvidersDisplay providers={details['watch/providers'].results.BR.flatrate} /></div>
+                    )
                 )}
+                
                 <div className="mt-6 pt-6 border-t border-gray-700 flex flex-col sm:flex-row gap-3">
                     <button onClick={() => onAddToWatchlist(item)} disabled={isInWatchlist} className="w-full sm:w-auto flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
                         {isInWatchlist ? 'Já está na Watchlist' : 'Adicionar à Watchlist'}
@@ -67,10 +75,16 @@ const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, onAddToWatch
 interface CarouselCardProps {
     item: RadarItem;
     onClick: () => void;
+    rank?: number; // Opcional: para o número do Top 10
 }
-const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick }) => (
+const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick, rank }) => (
     <div onClick={onClick} className="flex-shrink-0 w-40 cursor-pointer group">
         <div className="relative overflow-hidden rounded-lg shadow-lg">
+            {rank && (
+                <div className="absolute top-0 left-0 z-10 w-10 h-10 bg-black/50 backdrop-blur-sm rounded-br-lg flex items-center justify-center">
+                    <span className="text-xl font-bold text-white">{rank}</span>
+                </div>
+            )}
             <img src={item.posterUrl || 'https://placehold.co/400x600/374151/9ca3af?text=?'} alt={`Pôster de ${item.title}`} className="w-full h-60 object-cover transition-transform duration-300 group-hover:scale-105"/>
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
         </div>
@@ -84,12 +98,13 @@ interface CarouselProps {
     title: string;
     items: RadarItem[];
     onItemClick: (item: RadarItem) => void;
+    isRanked?: boolean; // Opcional: para saber se é um Top 10
 }
-const Carousel: React.FC<CarouselProps> = ({ title, items, onItemClick }) => (
+const Carousel: React.FC<CarouselProps> = ({ title, items, onItemClick, isRanked = false }) => (
     <div className="mb-12">
         <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
-            {items.map(item => <CarouselCard key={item.id} item={item} onClick={() => onItemClick(item)} />)}
+            {items.map((item, index) => <CarouselCard key={item.id} item={item} onClick={() => onItemClick(item)} rank={isRanked ? index + 1 : undefined} />)}
             {items.length === 0 && <p className="text-gray-500">Nenhum item nesta categoria por enquanto.</p>}
         </div>
     </div>
@@ -148,7 +163,11 @@ const RadarView: React.FC = () => {
     // Filtra os itens por listType para cada carrossel
     const upcoming = useMemo(() => relevantReleases.filter(r => r.listType === 'upcoming').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [relevantReleases]);
     const nowPlaying = useMemo(() => relevantReleases.filter(r => r.listType === 'now_playing').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [relevantReleases]);
-    const topNetflix = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider'), [relevantReleases]);
+    const trending = useMemo(() => relevantReleases.filter(r => r.listType === 'trending'), [relevantReleases]);
+    const topNetflix = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.title.toLowerCase().includes('netflix')), [relevantReleases]); // Um truque para separar, idealmente teríamos o ID do provider
+    const topPrime = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.title.toLowerCase().includes('prime')), [relevantReleases]);
+    const topMax = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.title.toLowerCase().includes('max')), [relevantReleases]);
+    const topDisney = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.title.toLowerCase().includes('disney')), [relevantReleases]);
 
     return (
         <div className="p-4">
@@ -162,8 +181,7 @@ const RadarView: React.FC = () => {
             )}
             
             <div className="text-center mb-10">
-                <h1 className="text-4xl font-bold text-white mb-2">Radar de Lançamentos</h1>
-                <p className="text-lg text-gray-400">O seu calendário pessoal de futuros favoritos.</p>
+                <h1 className="text-4xl font-bold text-white">Radar de Lançamentos</h1>
             </div>
 
             {isLoading && <p className="text-center text-gray-400">{statusText}</p>}
@@ -172,8 +190,12 @@ const RadarView: React.FC = () => {
             {!isLoading && !error && (
                 <div>
                     <Carousel title="Nos Cinemas" items={nowPlaying} onItemClick={setSelectedItem} />
-                    <Carousel title="Top 10 na Netflix" items={topNetflix} onItemClick={setSelectedItem} />
-                    <Carousel title="Em Breve & No Ar" items={upcoming} onItemClick={setSelectedItem} />
+                    <Carousel title="Tendências da Semana" items={trending} onItemClick={setSelectedItem} />
+                    <Carousel title="Top 10 Netflix" items={topNetflix} onItemClick={setSelectedItem} isRanked={true} />
+                    <Carousel title="Top 10 Prime Video" items={topPrime} onItemClick={setSelectedItem} isRanked={true} />
+                    <Carousel title="Top 10 Max" items={topMax} onItemClick={setSelectedItem} isRanked={true} />
+                    <Carousel title="Top 10 Disney+" items={topDisney} onItemClick={setSelectedItem} isRanked={true} />
+                    <Carousel title="Relevante para Si (Em Breve)" items={upcoming} onItemClick={setSelectedItem} />
                 </div>
             )}
         </div>

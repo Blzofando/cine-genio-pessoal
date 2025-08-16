@@ -1,4 +1,4 @@
-// src/types.ts (Completo e Atualizado)
+// src/types.ts (Completo)
 
 export type MediaType = 'Filme' | 'Série' | 'Anime' | 'Programa';
 export type Rating = 'amei' | 'gostei' | 'meh' | 'naoGostei';
@@ -65,7 +65,7 @@ export interface RadarItem {
     posterUrl?: string;
     releaseDate: string;
     type: 'movie' | 'tv';
-    listType: 'upcoming' | 'now_playing' | 'top_rated_provider'; 
+    listType: 'upcoming' | 'now_playing' | 'top_rated_provider' | 'trending'; 
 }
 
 export type AllManagedWatchedData = {
