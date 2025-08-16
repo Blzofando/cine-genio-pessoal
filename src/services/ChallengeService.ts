@@ -40,14 +40,15 @@ export const getWeeklyChallenge = async (watchedData: AllManagedWatchedData): Pr
 
     const prompt = `Hoje é ${currentDate}. Você é o "CineGênio Pessoal". Sua tarefa é analisar o perfil de um usuário e criar um "Desafio Semanal" criativo e temático.
 
-**TÍTULOS JÁ ASSISTIDOS PELO USUÁRIO (NUNCA SUGERIR ESTES):**
-${allWatchedTitles}
 
 **REGRAS DO DESAFIO:**
 1. Seja Criativo: Crie temas como "Maratona de um Diretor", "Clássicos de Halloween" (se for Outubro), etc.
 2. Passo Único ou Múltiplo: O desafio pode ser assistir a um único filme ou uma lista.
 3. Conecte com o Gosto: O desafio deve ter alguma conexão com o que o usuário já ama.
 4. Seja Convincente: A razão deve ser curta e despertar a curiosidade.
+
+**TÍTULOS JÁ ASSISTIDOS PELO USUÁRIO NÃO SUGERIR:**
+${allWatchedTitles}
 
 **PERFIL DO USUÁRIO:**
 ${formattedData}
