@@ -1,4 +1,4 @@
-// src/types.ts
+// src/types.ts (Completo)
 
 export type MediaType = 'Filme' | 'Série' | 'Anime' | 'Programa';
 export type Rating = 'amei' | 'gostei' | 'meh' | 'naoGostei';
@@ -40,20 +40,18 @@ export interface WatchlistItem {
   loveProbability?: number;
 }
 
-// ### NOVO TIPO ADICIONADO AQUI ###
 export interface ChallengeStep {
     title: string;
     tmdbId: number;
     completed: boolean;
 }
 
-// ### INTERFACE CORRIGIDA ###
 export interface Challenge {
     id: string; 
     challengeType: string;
     reason: string;
     status: 'active' | 'completed' | 'lost';
-    // Propriedades para desafio de PASSO ÚNICO (agora opcionais)
+    // Propriedades para desafio de PASSO ÚNICO (opcionais)
     tmdbId?: number;
     tmdbMediaType?: 'movie' | 'tv';
     title?: string;

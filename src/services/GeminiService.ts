@@ -1,7 +1,9 @@
+// src/services/GeminiService.ts (Completo)
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { AllManagedWatchedData, ManagedWatchedItem, Recommendation, DuelResult, RadarRelease, Challenge } from '../types';
 
-// --- Helper para Formatar Dados ---
+// Exportando esta função para que outros serviços possam usá-la
 export const formatWatchedDataForPrompt = (data: AllManagedWatchedData): string => {
     const formatList = (list: ManagedWatchedItem[]) => list.map(item => `- ${item.title} (Tipo: ${item.type}, Gênero: ${item.genre})`).join('\n') || 'Nenhum';
     return `
@@ -17,6 +19,30 @@ ${formatList(data.meh)}
 **Não Gostei (obras que não me agradaram, elementos a excluir completamente):**
 ${formatList(data.naoGostei)}
     `.trim();
+};
+
+const challengeSchema = {
+    type: Type.OBJECT,
+    properties: {
+        tmdbId: { type: Type.INTEGER, description: "O ID numérico do TMDb do título, CASO seja um desafio de um só filme." },
+        tmdbMediaType: { type: Type.STRING, enum: ['movie', 'tv'], description: "O tipo de mídia, CASO seja um desafio de um só filme." },
+        title: { type: Type.STRING, description: "O título oficial do filme/série, CASO seja um desafio de um só filme." },
+        challengeType: { type: Type.STRING, description: "Um nome criativo para o tipo de desafio (ex: 'Desafio do Diretor')." },
+        reason: { type: Type.STRING, description: "Uma justificativa curta e convincente." },
+        steps: {
+            type: Type.ARRAY,
+            description: "Uma lista de títulos, CASO seja um desafio de múltiplos passos.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING },
+                    tmdbId: { type: Type.INTEGER },
+                },
+                required: ["title", "tmdbId"]
+            }
+        }
+    },
+    required: ["challengeType", "reason"]
 };
 
 
@@ -166,21 +192,21 @@ export const fetchLoveProbability = async (prompt: string): Promise<number> => {
     return result.loveProbability;
 };
 
-export const fetchChallengeIdea = async (prompt: string): Promise<{ challengeType: string; reason: string; searchQuery: string; }> => {
+export const fetchWeeklyChallenge = async (prompt: string): Promise<Omit<Challenge, 'id' | 'posterUrl' | 'status'>> => {
     if (!import.meta.env.VITE_GEMINI_API_KEY) {
         return { 
-            challengeType: "Explorador de Clássicos", 
-            reason: "Você adora ficção científica, mas ainda não explorou este pilar do gênero.",
-            searchQuery: "top rated sci-fi 1982" 
+            tmdbId: 278, 
+            tmdbMediaType: 'movie', 
+            title: "Um Sonho de Liberdade (1994)", 
+            challengeType: "Desafio do Clássico", 
+            reason: "Você adora dramas aclamados, mas este clássico absoluto ainda não está na sua coleção." 
         };
     }
-
     const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY as string });
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
-        config: { responseMimeType: "application/json", responseSchema: challengeIdeaSchena }
+        config: { responseMimeType: "application/json", responseSchema: challengeSchema }
     });
-
     return JSON.parse(response.text.trim());
 };
