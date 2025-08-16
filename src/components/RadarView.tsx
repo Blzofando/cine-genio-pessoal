@@ -1,13 +1,13 @@
 // src/components/RadarView.tsx
 
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { WatchedDataContext } from '../App';
 import { CalendarItem, RadarItem, WatchProvider } from '../types';
 import { getRelevantReleases, getMyCalendar, addToMyCalendar } from '../services/firestoreService';
 import { updateRelevantReleasesIfNeeded } from '../services/RadarUpdateService';
-import { getTMDbDetails, getProviders } from '../services/TMDbService';
+import { getTMDbDetails } from '../services/TMDbService';
 
-// --- Componentes ---
+// --- Componentes Internos ---
 
 const Modal = ({ children, onClose }: { children: React.ReactNode, onClose: () => void }) => ( <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={onClose}><div className="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up" onClick={e => e.stopPropagation()}>{children}</div></div>);
 const WatchProvidersDisplay: React.FC<{ providers: WatchProvider[] }> = ({ providers }) => ( <div className="flex flex-wrap gap-3">{providers.map(p => (<img key={p.provider_id} src={`https://image.tmdb.org/t/p/w92${p.logo_path}`} alt={p.provider_name} title={p.provider_name} className="w-12 h-12 rounded-lg object-cover bg-gray-700"/>))}</div>);
@@ -69,7 +69,7 @@ const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick }) => (
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
         </div>
         <h3 className="text-white font-bold mt-2 truncate">{item.title}</h3>
-        <p className="text-indigo-400 text-sm">{new Date(item.releaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</p>
+        <p className="text-indigo-400 text-sm">{new Date(item.releaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', timeZone: 'UTC' })}</p>
     </div>
 );
 
@@ -104,11 +104,9 @@ const RadarView: React.FC = () => {
             setIsLoading(true);
             setError(null);
             try {
-                // Aciona a atualização em segundo plano (só executa se necessário)
                 setStatusText("A verificar se há novidades...");
                 await updateRelevantReleasesIfNeeded(watchedData);
 
-                // Busca os dados já persistidos para exibir na tela imediatamente
                 setStatusText("A carregar lançamentos...");
                 const [releases, calendar] = await Promise.all([
                     getRelevantReleases(),
@@ -126,32 +124,36 @@ const RadarView: React.FC = () => {
             }
         };
 
-        // Garante que temos os dados do usuário antes de rodar a lógica
         if (Object.values(watchedData).flat().length > 0) {
             initializeRadar();
         } else if (!isLoading) {
-             // Se não há dados do usuário e não está carregando, define como pronto.
-             setIsLoading(false)
+             setIsLoading(false);
+             setStatusText("Adicione itens à sua coleção para que o Gênio possa gerar seu radar.");
         }
     }, [watchedData]);
     
     const handleAddToCalendar = async (item: RadarItem) => {
         const calendarItem: CalendarItem = { ...item, addedAt: Date.now() };
         await addToMyCalendar(calendarItem);
-        setMyCalendar(prev => [...prev, calendarItem]);
-        setSelectedItem(null); // Fecha o modal
+        setMyCalendar(prev => [...prev, calendarItem].sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()));
+        setSelectedItem(null);
     };
     
-    // Separa os itens para os carrosséis
-    const upcomingMovies = relevantReleases
-        .filter(r => r.type === 'movie')
-        .sort((a, b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime())
-        .slice(0, 20);
+    const upcomingMovies = useMemo(() => 
+        relevantReleases
+            .filter(r => r.type === 'movie')
+            .sort((a, b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime())
+            .slice(0, 20),
+        [relevantReleases]
+    );
 
-    const onTheAirShows = relevantReleases
-        .filter(r => r.type === 'tv')
-        .sort((a, b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime())
-        .slice(0, 20);
+    const onTheAirShows = useMemo(() =>
+        relevantReleases
+            .filter(r => r.type === 'tv')
+            .sort((a, b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime())
+            .slice(0, 20),
+        [relevantReleases]
+    );
 
     return (
         <div className="p-4">
@@ -170,10 +172,11 @@ const RadarView: React.FC = () => {
             </div>
 
             {isLoading && <p className="text-center text-gray-400">{statusText}</p>}
-            {error && <p className="text-center text-red-400">{error}</p>}
+            {error && <p className="text-center text-red-400 bg-red-900/50 p-4 rounded-lg">{error}</p>}
             
             {!isLoading && !error && (
                 <div>
+                    <Carousel title="Meu Calendário" items={myCalendar} onItemClick={setSelectedItem} />
                     <Carousel title="Próximos nos Cinemas" items={upcomingMovies} onItemClick={setSelectedItem} />
                     <Carousel title="Séries No Ar" items={onTheAirShows} onItemClick={setSelectedItem} />
                 </div>

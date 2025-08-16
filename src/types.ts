@@ -1,4 +1,4 @@
-// src/types.ts (Completo)
+// src/types.ts (Completo e Corrigido)
 
 export type MediaType = 'Filme' | 'Série' | 'Anime' | 'Programa';
 export type Rating = 'amei' | 'gostei' | 'meh' | 'naoGostei';
@@ -51,14 +51,33 @@ export interface Challenge {
     challengeType: string;
     reason: string;
     status: 'active' | 'completed' | 'lost';
-    // Propriedades para desafio de PASSO ÚNICO (opcionais)
     tmdbId?: number;
     tmdbMediaType?: 'movie' | 'tv';
     title?: string;
     posterUrl?: string;
-    // Propriedades para desafio de MÚLTIPLOS PASSOS (opcional)
     steps?: ChallengeStep[];
 }
+
+// DEFINIÇÕES QUE FALTAVAM, AGORA CORRIGIDAS
+export interface RadarItem {
+    id: number; // TMDB ID
+    tmdbMediaType: 'movie' | 'tv';
+    title: string;
+    posterUrl?: string;
+    releaseDate: string; // Data de lançamento (ex: "2025-12-25")
+    type: 'movie' | 'tv';
+    status?: string;
+    nextEpisodeToAir?: {
+        air_date: string;
+        episode_number: number;
+        season_number: number;
+    };
+}
+
+export interface CalendarItem extends RadarItem {
+    addedAt: number;
+}
+
 
 export type AllManagedWatchedData = {
   [key in Rating]: ManagedWatchedItem[];
@@ -97,26 +116,13 @@ export interface DuelResult {
     verdict: string;
 }
 
-// NOVO: Representa um item na lista de lançamentos relevantes
-export interface RadarItem {
-    id: number; // TMDB ID
+export interface RadarRelease {
+    id: number;
     tmdbMediaType: 'movie' | 'tv';
     title: string;
     posterUrl?: string;
-    releaseDate: string; // Data de lançamento (ex: "2025-12-25")
-    type: 'movie' | 'tv';
-    // Para séries "No Ar"
-    status?: string; // Ex: "Returning Series"
-    nextEpisodeToAir?: {
-        air_date: string;
-        episode_number: number;
-        season_number: number;
-    };
-}
-
-// NOVO: Representa um item que o usuário salvou no seu calendário pessoal
-export interface CalendarItem extends RadarItem {
-    addedAt: number;
+    releaseDate: string;
+    reason: string;
 }
 
 export interface TMDbSearchResult {
