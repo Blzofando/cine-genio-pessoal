@@ -1,138 +1,125 @@
-// src/services/RadarUpdateService.ts
-
 import { db } from './firebaseConfig';
 import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { AllManagedWatchedData, RadarItem, TMDbSearchResult } from '../types';
-import { getUpcomingMovies, getOnTheAirTV, getNowPlayingMovies, getTopRatedOnProvider, getTrending, getTMDbDetails } from './TMDbService';
+import { getUpcomingMovies, getOnTheAirTV, getNowPlayingMovies, getTopRatedOnProvider, getTrending } from './TMDbService';
 import { formatWatchedDataForPrompt, fetchPersonalizedRadar } from './GeminiService';
-import { setRelevantReleases } from './firestoreService';
+import { getRelevantReleases, setRelevantReleases } from './firestoreService';
 
 const METADATA_DOC_ID = 'radarMetadata';
-const UPDATE_INTERVAL_DAYS = 1;
 
-const shouldUpdate = async (): Promise<boolean> => {
+// Verifica dois 'cronómetros' separados: um para as listas diárias e um para a semanal
+const shouldUpdate = async (): Promise<{ daily: boolean; weekly: boolean }> => {
     const metadataRef = doc(db, 'metadata', METADATA_DOC_ID);
     const metadataSnap = await getDoc(metadataRef);
 
     if (!metadataSnap.exists()) {
-        console.log("Metadados do Radar não encontrados. Primeira atualização necessária.");
-        return true;
+        console.log("Metadados do Radar não encontrados. Primeira atualização completa necessária.");
+        return { daily: true, weekly: true };
     }
 
-    const lastUpdate = (metadataSnap.data().lastUpdate as Timestamp).toDate();
-    const daysSinceLastUpdate = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 3600 * 24);
+    const data = metadataSnap.data();
+    const lastDailyUpdate = (data.lastDailyUpdate as Timestamp)?.toDate() || new Date(0);
+    const lastWeeklyUpdate = (data.lastWeeklyUpdate as Timestamp)?.toDate() || new Date(0);
 
-    if (daysSinceLastUpdate >= UPDATE_INTERVAL_DAYS) {
-        console.log(`Já se passaram ${daysSinceLastUpdate.toFixed(1)} dias. Nova atualização do Radar necessária.`);
-        return true;
-    }
+    const now = new Date();
+    const daysSinceDaily = (now.getTime() - lastDailyUpdate.getTime()) / (1000 * 3600 * 24);
+    const daysSinceWeekly = (now.getTime() - lastWeeklyUpdate.getTime()) / (1000 * 3600 * 24);
 
-    console.log(`Ainda não é hora de atualizar o Radar. A usar dados em cache.`);
-    return false;
+    const daily = daysSinceDaily >= 1;
+    const weekly = daysSinceWeekly >= 7;
+    
+    if(daily) console.log("Atualização diária do Radar necessária.");
+    if(weekly) console.log("Atualização semanal do Radar (Relevantes) necessária.");
+
+    return { daily, weekly };
 };
 
-// Função auxiliar para converter um resultado do TMDb para o nosso tipo RadarItem
 const toRadarItem = (item: TMDbSearchResult, listType: RadarItem['listType'], providerId?: number): RadarItem | null => {
     const releaseDate = item.release_date || item.first_air_date;
     if (!releaseDate) return null;
-
+    const mediaType = item.media_type || (item.title ? 'movie' : 'tv');
     const fullTitle = item.title || item.name;
     const yearRegex = /\(\d{4}\)/;
     const titleWithYear = yearRegex.test(fullTitle || '') 
         ? fullTitle 
         : `${fullTitle} (${new Date(releaseDate).getFullYear()})`;
-    
-    // CORREÇÃO DEFINITIVA: Garante que o media_type está sempre presente
-    const mediaType = item.media_type || (item.title ? 'movie' : 'tv');
 
     const radarItem: RadarItem = {
-        id: item.id,
-        tmdbMediaType: mediaType,
-        title: titleWithYear || 'Título Desconhecido',
-        releaseDate: releaseDate,
-        type: mediaType,
-        listType: listType,
+        id: item.id, tmdbMediaType: mediaType, title: titleWithYear || 'Título Desconhecido',
+        releaseDate, type: mediaType, listType, providerId,
+        posterUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
     };
-
-    if (item.poster_path) {
-        radarItem.posterUrl = `https://image.tmdb.org/t/p/w500${item.poster_path}`;
-    }
-    if (providerId) {
-        radarItem.providerId = providerId;
-    }
-    
     return radarItem;
 };
 
 export const updateRelevantReleasesIfNeeded = async (watchedData: AllManagedWatchedData): Promise<void> => {
-    if (!(await shouldUpdate())) {
+    const { daily, weekly } = await shouldUpdate();
+    if (!daily && !weekly) {
+        console.log("Radar está atualizado.");
         return;
     }
 
-    console.log("Iniciando atualização completa do Radar de Lançamentos...");
+    const existingItems = await getRelevantReleases();
+    const itemsMap = new Map<number, RadarItem>(existingItems.map(item => [item.id, item]));
 
-    const PROVIDER_IDS = { netflix: 8, prime: 119, max: 1899, disney: 337 };
+    // Atualiza as listas diárias se necessário
+    if (daily) {
+        console.log("Iniciando atualização das listas diárias...");
+        const PROVIDER_IDS = { netflix: 8, prime: 119, max: 1899, disney: 337 };
+        const [nowPlaying, trending, topNetflix, topPrime, topMax, topDisney] = await Promise.all([
+            getNowPlayingMovies(), getTrending(),
+            getTopRatedOnProvider(PROVIDER_IDS.netflix), getTopRatedOnProvider(PROVIDER_IDS.prime),
+            getTopRatedOnProvider(PROVIDER_IDS.max), getTopRatedOnProvider(PROVIDER_IDS.disney)
+        ]);
 
-    const [
-        upcomingMovies, onTheAirShows, nowPlayingMovies, trending,
-        topNetflix, topPrime, topMax, topDisney
-    ] = await Promise.all([
-        getUpcomingMovies(),
-        getOnTheAirTV(),
-        getNowPlayingMovies(),
-        getTrending(),
-        getTopRatedOnProvider(PROVIDER_IDS.netflix),
-        getTopRatedOnProvider(PROVIDER_IDS.prime),
-        getTopRatedOnProvider(PROVIDER_IDS.max),
-        getTopRatedOnProvider(PROVIDER_IDS.disney),
-    ]);
-
-    // --- Processamento da lista "Em Breve" com IA (LÓGICA RESTAURADA) ---
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const futureContent = [...upcomingMovies, ...onTheAirShows].filter(item => {
-        const releaseDate = new Date(item.release_date || item.first_air_date || '');
-        return releaseDate >= today;
-    });
-
-    let relevantUpcomingItems: RadarItem[] = [];
-    if (futureContent.length > 0) {
-        const releasesForPrompt = futureContent.map(r => `- ${r.title || r.name} (ID: ${r.id}, Tipo: ${r.media_type})`).join('\n');
-        const formattedData = formatWatchedDataForPrompt(watchedData);
-        const prompt = `Analise a lista de próximos lançamentos e séries no ar e selecione até 20 que sejam mais relevantes para o usuário, com base no seu perfil de gosto.\n\n**PERFIL DO USUÁRIO:**\n${formattedData}\n\n**LISTA DE LANÇAMENTOS:**\n${releasesForPrompt}\n\n**Sua Tarefa:**\nRetorne um objeto JSON com uma chave "releases", com os 20 mais promissores.`;
+        const dailyItems = [
+            ...nowPlaying.map(m => toRadarItem(m, 'now_playing')),
+            ...trending.map(t => toRadarItem(t, 'trending')),
+            ...topNetflix.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.netflix)),
+            ...topPrime.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.prime)),
+            ...topMax.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.max)),
+            ...topDisney.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.disney)),
+        ].filter((item): item is RadarItem => item !== null);
         
-        const aiResult = await fetchPersonalizedRadar(prompt);
+        // Remove listas diárias antigas e adiciona as novas
+        existingItems.forEach(item => {
+            if(item.listType !== 'upcoming') itemsMap.delete(item.id);
+        });
+        dailyItems.forEach(item => itemsMap.set(item.id, item));
 
-        relevantUpcomingItems = aiResult.releases
-            .map(release => {
-                const original = futureContent.find(r => r.id === release.id);
-                if (original) {
-                    original.media_type = original.media_type || (original.title ? 'movie' : 'tv');
-                }
-                return original ? toRadarItem(original, 'upcoming') : null;
-            })
-            .filter((item): item is RadarItem => item !== null);
+        await setDoc(doc(db, 'metadata', METADATA_DOC_ID), { lastDailyUpdate: new Date() }, { merge: true });
+        console.log("Listas diárias atualizadas.");
     }
-    
-    // --- Processamento das outras listas ---
-    const nowPlayingItems = nowPlayingMovies.map(m => toRadarItem(m, 'now_playing')).filter((item): item is RadarItem => item !== null);
-    const trendingItems = trending.map(t => toRadarItem(t, 'trending')).filter((item): item is RadarItem => item !== null);
-    const netflixItems = topNetflix.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.netflix)).filter((item): item is RadarItem => item !== null);
-    const primeItems = topPrime.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.prime)).filter((item): item is RadarItem => item !== null);
-    const maxItems = topMax.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.max)).filter((item): item is RadarItem => item !== null);
-    const disneyItems = topDisney.map(m => toRadarItem(m, 'top_rated_provider', PROVIDER_IDS.disney)).filter((item): item is RadarItem => item !== null);
-    
-    const allItemsMap = new Map<number, RadarItem>();
-    [...nowPlayingItems, ...trendingItems, ...netflixItems, ...primeItems, ...maxItems, ...disneyItems, ...relevantUpcomingItems].forEach(item => {
-        if (item && !allItemsMap.has(item.id)) {
-            allItemsMap.set(item.id, item);
+
+    // Atualiza a lista semanal (relevantes) se necessário
+    if (weekly) {
+        console.log("Iniciando atualização da lista semanal (Relevantes)...");
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const [upcomingMovies, onTheAirShows] = await Promise.all([getUpcomingMovies(), getOnTheAirTV()]);
+        const futureContent = [...upcomingMovies, ...onTheAirShows].filter(item => new Date(item.release_date || item.first_air_date || '') >= today);
+
+        if (futureContent.length > 0) {
+            const releasesForPrompt = futureContent.map(r => `- ${r.title || r.name} (ID: ${r.id})`).join('\n');
+            const formattedData = formatWatchedDataForPrompt(watchedData);
+            const prompt = `Analise o perfil e a lista de lançamentos e selecione até 20 mais relevantes.\n\n**PERFIL:**\n${formattedData}\n\n**LANÇAMENTOS:**\n${releasesForPrompt}`;
+            const aiResult = await fetchPersonalizedRadar(prompt);
+            const relevantUpcomingItems = aiResult.releases.map(release => {
+                const original = futureContent.find(r => r.id === release.id);
+                return original ? toRadarItem(original, 'upcoming') : null;
+            }).filter((item): item is RadarItem => item !== null);
+            
+            // Remove relevantes antigos e adiciona os novos
+            existingItems.forEach(item => {
+                if(item.listType === 'upcoming') itemsMap.delete(item.id);
+            });
+            relevantUpcomingItems.forEach(item => itemsMap.set(item.id, item));
         }
-    });
-    const allItems = Array.from(allItemsMap.values());
+        await setDoc(doc(db, 'metadata', METADATA_DOC_ID), { lastWeeklyUpdate: new Date() }, { merge: true });
+        console.log("Lista semanal (Relevantes) atualizada.");
+    }
 
+    const allItems = Array.from(itemsMap.values());
     await setRelevantReleases(allItems);
-    await setDoc(doc(db, 'metadata', METADATA_DOC_ID), { lastUpdate: new Date() });
-
-    console.log(`Atualização do Radar de Lançamentos concluída! ${allItems.length} itens salvos.`);
+    console.log(`Atualização do Radar finalizada! ${allItems.length} itens salvos.`);
 };
