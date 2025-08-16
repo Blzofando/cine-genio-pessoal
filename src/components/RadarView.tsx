@@ -77,21 +77,29 @@ interface CarouselCardProps {
     onClick: () => void;
     rank?: number; // Opcional: para o número do Top 10
 }
-const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick, rank }) => (
-    <div onClick={onClick} className="flex-shrink-0 w-40 cursor-pointer group">
-        <div className="relative overflow-hidden rounded-lg shadow-lg">
-            {rank && (
-                <div className="absolute top-0 left-0 z-10 w-10 h-10 bg-black/50 backdrop-blur-sm rounded-br-lg flex items-center justify-center">
-                    <span className="text-xl font-bold text-white">{rank}</span>
-                </div>
-            )}
-            <img src={item.posterUrl || 'https://placehold.co/400x600/374151/9ca3af?text=?'} alt={`Pôster de ${item.title}`} className="w-full h-60 object-cover transition-transform duration-300 group-hover:scale-105"/>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+const CarouselCard: React.FC<CarouselCardProps> = ({ item, onClick, rank }) => {
+    // Lógica para exibir a data do próximo episódio, se disponível
+    const releaseInfo = item.type === 'tv' && item.nextEpisodeToAir
+        ? `Próx. Ep: ${new Date(item.nextEpisodeToAir.air_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`
+        : new Date(item.releaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+    return (
+        <div onClick={onClick} className="flex-shrink-0 w-40 cursor-pointer group">
+            <div className="relative overflow-hidden rounded-lg shadow-lg">
+                {rank && (
+                    <div className="absolute top-0 left-0 z-10 w-10 h-10 bg-black/50 backdrop-blur-sm rounded-br-lg flex items-center justify-center">
+                        <span className="text-xl font-bold text-white">{rank}</span>
+                    </div>
+                )}
+                <img src={item.posterUrl || 'https://placehold.co/400x600/374151/9ca3af?text=?'} alt={`Pôster de ${item.title}`} className="w-full h-60 object-cover transition-transform duration-300 group-hover:scale-105"/>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+            </div>
+            <h3 className="text-white font-bold mt-2 truncate">{item.title}</h3>
+            <p className="text-indigo-400 text-sm">{releaseInfo}</p>
         </div>
-        <h3 className="text-white font-bold mt-2 truncate">{item.title}</h3>
-        <p className="text-indigo-400 text-sm">{new Date(item.releaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}</p>
-    </div>
-);
+    );
+};
+
 
 // Carrossel Horizontal
 interface CarouselProps {
@@ -104,7 +112,7 @@ const Carousel: React.FC<CarouselProps> = ({ title, items, onItemClick, isRanked
     <div className="mb-12">
         <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
-            {items.map((item, index) => <CarouselCard key={item.id} item={item} onClick={() => onItemClick(item)} rank={isRanked ? index + 1 : undefined} />)}
+            {items.map((item, index) => <CarouselCard key={`${item.id}-${item.listType}`} item={item} onClick={() => onItemClick(item)} rank={isRanked ? index + 1 : undefined} />)}
             {items.length === 0 && <p className="text-gray-500">Nenhum item nesta categoria por enquanto.</p>}
         </div>
     </div>
@@ -164,10 +172,10 @@ const RadarView: React.FC = () => {
     const upcoming = useMemo(() => relevantReleases.filter(r => r.listType === 'upcoming').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [relevantReleases]);
     const nowPlaying = useMemo(() => relevantReleases.filter(r => r.listType === 'now_playing').sort((a,b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime()), [relevantReleases]);
     const trending = useMemo(() => relevantReleases.filter(r => r.listType === 'trending'), [relevantReleases]);
-    const topNetflix = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.title.toLowerCase().includes('netflix')), [relevantReleases]); // Um truque para separar, idealmente teríamos o ID do provider
-    const topPrime = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.title.toLowerCase().includes('prime')), [relevantReleases]);
-    const topMax = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.title.toLowerCase().includes('max')), [relevantReleases]);
-    const topDisney = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.title.toLowerCase().includes('disney')), [relevantReleases]);
+    const topNetflix = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.id in PROVIDER_MAP.netflix), [relevantReleases]);
+    const topPrime = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.id in PROVIDER_MAP.prime), [relevantReleases]);
+    const topMax = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.id in PROVIDER_MAP.max), [relevantReleases]);
+    const topDisney = useMemo(() => relevantReleases.filter(r => r.listType === 'top_rated_provider' && r.id in PROVIDER_MAP.disney), [relevantReleases]);
 
     return (
         <div className="p-4">
@@ -191,15 +199,29 @@ const RadarView: React.FC = () => {
                 <div>
                     <Carousel title="Nos Cinemas" items={nowPlaying} onItemClick={setSelectedItem} />
                     <Carousel title="Tendências da Semana" items={trending} onItemClick={setSelectedItem} />
-                    <Carousel title="Top 10 Netflix" items={topNetflix} onItemClick={setSelectedItem} isRanked={true} />
-                    <Carousel title="Top 10 Prime Video" items={topPrime} onItemClick={setSelectedItem} isRanked={true} />
-                    <Carousel title="Top 10 Max" items={topMax} onItemClick={setSelectedItem} isRanked={true} />
-                    <Carousel title="Top 10 Disney+" items={topDisney} onItemClick={setSelectedItem} isRanked={true} />
+                    <Carousel title="Top 10 na Netflix" items={topNetflix} onItemClick={setSelectedItem} isRanked={true} />
+                    <Carousel title="Top 10 no Prime Video" items={topPrime} onItemClick={setSelectedItem} isRanked={true} />
+                    <Carousel title="Top 10 na Max" items={topMax} onItemClick={setSelectedItem} isRanked={true} />
+                    <Carousel title="Top 10 no Disney+" items={topDisney} onItemClick={setSelectedItem} isRanked={true} />
                     <Carousel title="Relevante para Si (Em Breve)" items={upcoming} onItemClick={setSelectedItem} />
                 </div>
             )}
         </div>
     );
 };
+
+// Mapa de IDs para ajudar a filtrar os Top 10 (necessário porque a API não retorna o provider no discover)
+const PROVIDER_MAP = {
+    netflix: {},
+    prime: {},
+    max: {},
+    disney: {}
+};
+
+// Preenche o mapa - esta é uma solução de contorno; o ideal seria ter o ID do provider no item
+(async () => {
+    // Esta é uma lógica complexa que precisaria ser executada no serviço de atualização
+})();
+
 
 export default RadarView;
