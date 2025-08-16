@@ -13,32 +13,40 @@ const ChatView: React.FC<ChatViewProps> = ({ setView, setSuggestionFilters }) =>
         const lowerCaseMessage = message.toLowerCase();
         
         if (lowerCaseMessage.includes('sugestão') || lowerCaseMessage.includes('recomenda')) {
-            let remainingMessage = ` ${lowerCaseMessage.replace('sugestão de', '').replace('sugestão', '').replace('recomenda', '').trim()} `;
+            let textToProcess = ` ${lowerCaseMessage} `;
             
             const categories: { [key: string]: MediaType } = { 'filme': 'Filme', 'série': 'Série', 'anime': 'Anime', 'programa': 'Programa' };
             const genres = ['ação', 'comédia', 'drama', 'ficção científica', 'suspense', 'terror', 'romance', 'aventura', 'mistério', 'fantasia'];
-            
+            const junkWords = ['quero', 'uma', 'um', 'sugestão', 'de', 'recomenda', 'me', 'dá', 'pra'];
+
             const foundFilters: SuggestionFilters = { category: null, genres: [], keywords: '' };
 
-            // Procura por categoria
+            // Procura e remove a categoria
             for (const key in categories) {
-                if (remainingMessage.includes(` ${key} `)) {
+                if (textToProcess.includes(` ${key} `)) {
                     foundFilters.category = categories[key];
-                    remainingMessage = remainingMessage.replace(` ${key} `, ' ');
+                    textToProcess = textToProcess.replace(` ${key} `, ' ');
                 }
             }
 
-            // Procura por gêneros
+            // Procura e remove os gêneros
             for (const genre of genres) {
-                if (remainingMessage.includes(` ${genre} `)) {
+                if (textToProcess.includes(` ${genre} `)) {
                     const capitalizedGenre = genre.charAt(0).toUpperCase() + genre.slice(1);
                     foundFilters.genres.push(capitalizedGenre);
-                    remainingMessage = remainingMessage.replace(` ${genre} `, ' ');
+                    textToProcess = textToProcess.replace(` ${genre} `, ' ');
                 }
             }
+            
+            // ### NOVA LÓGICA DE LIMPEZA ###
+            // Remove as palavras de preenchimento
+            junkWords.forEach(word => {
+                const regex = new RegExp(`\\b${word}\\b`, 'g');
+                textToProcess = textToProcess.replace(regex, '');
+            });
 
-            // O que sobra vira palavra-chave
-            foundFilters.keywords = remainingMessage.trim().replace(/  +/g, ' ');
+            // O que sobra, limpo, vira palavra-chave
+            foundFilters.keywords = textToProcess.trim().replace(/  +/g, ' ');
 
             setSuggestionFilters(foundFilters);
             setView(View.SUGGESTION);
