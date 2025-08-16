@@ -84,13 +84,16 @@ export interface RadarRelease {
     reason: string;
 }
 export interface Challenge {
-    title: string;
+    id: string; // ex: "2025-33" (ano e semana)
     tmdbId: number;
     tmdbMediaType: 'movie' | 'tv';
+    title: string;
     posterUrl?: string;
-    challengeType: string;
+    challengeType: string; // Ex: "Desafio do Diretor", "Gênero Oculto"
     reason: string;
-    weekId: string;
+    status: 'active' | 'completed' | 'lost';
+    // Itens para desafios de múltiplos passos (opcional)
+    steps?: { title: string; tmdbId: number; completed: boolean }[];
 }
 export interface TMDbSearchResult {
     id: number;
@@ -119,6 +122,6 @@ export enum View {
   WATCHLIST,
   DUEL,
   RADAR,
-  CHALLENGE,
+  CHALLENGE, // ADICIONADO AQUI
   CHAT
 }

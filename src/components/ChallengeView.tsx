@@ -1,16 +1,8 @@
-import React, { useState, useContext, useEffect, useCallback } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { WatchedDataContext } from '../App';
-import { WatchlistContext } from '../contexts/WatchlistContext';
-import { Challenge, WatchlistItem, Rating } from '../types';
-import { generateWeeklyChallenge } from '../services/ChallengeService';
+import { Challenge } from '../types';
+import { getWeeklyChallenge, updateChallenge } from '../services/ChallengeService';
 import { fetchPosterUrl } from '../services/TMDbService';
-
-// --- Helpers ---
-const getWeekId = () => {
-    const now = new Date();
-    const firstDay = new Date(now.setDate(now.getDate() - now.getDay()));
-    return `${firstDay.getFullYear()}-${firstDay.getMonth()}-${firstDay.getDate()}`;
-};
 
 const LoadingSpinner = () => (
     <div className="flex flex-col items-center justify-center space-y-2 mt-8">
@@ -19,80 +11,86 @@ const LoadingSpinner = () => (
     </div>
 );
 
+// --- Componente para um passo individual em um desafio de múltiplos passos ---
+interface StepCardProps {
+    step: Challenge['steps'][number];
+    onToggleStep: () => void;
+}
+const StepCard: React.FC<StepCardProps> = ({ step, onToggleStep }) => {
+    const [posterUrl, setPosterUrl] = useState<string | undefined>(undefined);
+
+    useEffect(() => {
+        // Busca o pôster do passo individualmente
+        fetchPosterUrl(step.title).then(url => setPosterUrl(url ?? undefined));
+    }, [step.title]);
+
+    return (
+        <div className="relative bg-gray-800 rounded-lg group overflow-hidden shadow-lg cursor-pointer" onClick={onToggleStep}>
+            <img 
+                src={posterUrl || 'https://placehold.co/500x750/374151/9ca3af?text=?'} 
+                alt={`Pôster de ${step.title}`} 
+                className="w-full h-full object-cover aspect-[2/3] transition-transform duration-300 group-hover:scale-105"
+            />
+            {step.completed && (
+                <div className="absolute inset-0 bg-green-900/70 backdrop-blur-sm flex flex-col items-center justify-center">
+                    <span className="text-5xl">✅</span>
+                    <span className="text-xl font-bold text-white mt-2">CONCLUÍDO</span>
+                </div>
+            )}
+            <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent"></div>
+            <p className="absolute bottom-2 left-2 right-2 text-white font-bold text-center text-sm">{step.title}</p>
+        </div>
+    );
+};
+
+
 const ChallengeView: React.FC = () => {
-    const { data: watchedData, addItem } = useContext(WatchedDataContext);
-    const { addToWatchlist, isInWatchlist } = useContext(WatchlistContext);
-    
+    const { data: watchedData } = useContext(WatchedDataContext);
     const [challenge, setChallenge] = useState<Challenge | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isCompleted, setIsCompleted] = useState(false);
 
-    const completeChallenge = useCallback(() => {
-        if (challenge) {
-            localStorage.setItem(`challenge_${challenge.weekId}_completed`, 'true');
-            setIsCompleted(true);
-        }
-    }, [challenge]);
-
+    // Busca o desafio da semana do Firebase
     useEffect(() => {
         const loadChallenge = async () => {
-            setIsLoading(true);
-            const weekId = getWeekId();
-            const storedChallenge = localStorage.getItem(`challenge_${weekId}`);
-            const challengeCompleted = localStorage.getItem(`challenge_${weekId}_completed`) === 'true';
-
-            if (storedChallenge) {
-                const parsedChallenge = JSON.parse(storedChallenge) as Challenge;
-                setChallenge(parsedChallenge);
-                setIsCompleted(challengeCompleted);
+            if (Object.values(watchedData).flat().length === 0) {
+                setError("Você precisa ter itens na sua coleção para gerar um desafio.");
                 setIsLoading(false);
-            } else {
-                try {
-                    const newChallengeData = await generateWeeklyChallenge(watchedData);
-                    const posterUrl = await fetchPosterUrl(newChallengeData.title);
-                    
-                    const newChallenge: Challenge = {
-                        ...newChallengeData,
-                        posterUrl: posterUrl ?? undefined,
-                        weekId: weekId,
-                    };
-
-                    localStorage.setItem(`challenge_${weekId}`, JSON.stringify(newChallenge));
-                    setChallenge(newChallenge);
-                    setIsCompleted(false);
-                } catch (err) {
-                    setError("Não foi possível gerar o desafio desta semana. Tente mais tarde.");
-                    console.error(err);
-                } finally {
-                    setIsLoading(false);
-                }
+                return;
+            }
+            setIsLoading(true);
+            try {
+                const challengeFromDb = await getWeeklyChallenge(watchedData);
+                setChallenge(challengeFromDb);
+            } catch (err) {
+                setError("Não foi possível gerar o desafio desta semana. Tente mais tarde.");
+                console.error(err);
+            } finally {
+                setIsLoading(false);
             }
         };
-
         loadChallenge();
     }, [watchedData]);
 
-    const handleAddToWatchlist = () => {
-        if (!challenge) return;
-        const item: WatchlistItem = {
-            id: challenge.tmdbId,
-            tmdbMediaType: challenge.tmdbMediaType,
-            title: challenge.title,
-            posterUrl: challenge.posterUrl,
-            addedAt: Date.now(),
+    // Função para marcar/desmarcar um passo em um desafio de múltiplos passos
+    const handleToggleStep = async (stepIndex: number) => {
+        if (!challenge || !challenge.steps) return;
+
+        const newSteps = [...challenge.steps];
+        newSteps[stepIndex].completed = !newSteps[stepIndex].completed;
+
+        const allStepsCompleted = newSteps.every(step => step.completed);
+
+        const updatedChallenge: Challenge = {
+            ...challenge,
+            steps: newSteps,
+            status: allStepsCompleted ? 'completed' : 'active',
         };
-        addToWatchlist(item);
-        completeChallenge(); // Marcar como concluído ao adicionar à lista
+
+        setChallenge(updatedChallenge); // Atualiza a UI imediatamente
+        await updateChallenge(updatedChallenge); // Salva no Firebase
     };
 
-    const handleMarkAsWatched = async () => {
-        if (!challenge) return;
-        // Simplesmente adiciona à coleção com uma avaliação padrão 'gostei'
-        // O modal de avaliação da watchlist pode ser usado no futuro para mais opções
-        await addItem(challenge.title, 'gostei');
-        completeChallenge();
-    };
 
     return (
         <div className="flex flex-col items-center p-4 text-center">
@@ -105,30 +103,42 @@ const ChallengeView: React.FC = () => {
             {error && <p className="mt-8 text-red-400 bg-red-900/50 p-4 rounded-lg">{error}</p>}
 
             {!isLoading && challenge && (
-                <div className="w-full max-w-lg bg-gray-800 border border-indigo-500/30 rounded-xl shadow-2xl p-6 animate-fade-in">
+                <div className="w-full max-w-4xl bg-gray-800 border border-indigo-500/30 rounded-xl shadow-2xl p-6 animate-fade-in">
                     <span className="inline-block bg-indigo-500/20 text-indigo-300 font-bold py-1 px-3 rounded-full text-sm border border-indigo-500 mb-4">
                         {challenge.challengeType}
                     </span>
-                    <img 
-                        src={challenge.posterUrl || 'https://placehold.co/400x600/374151/9ca3af?text=?'} 
-                        alt={`Pôster de ${challenge.title}`}
-                        className="w-48 h-72 object-cover rounded-lg shadow-lg mx-auto mb-4"
-                    />
-                    <h2 className="text-3xl font-bold text-white">{challenge.title}</h2>
-                    <p className="text-gray-300 mt-2 mb-6">{challenge.reason}</p>
-
-                    {isCompleted ? (
-                        <div className="bg-green-500/20 text-green-300 font-bold py-3 px-4 rounded-lg border border-green-500">
-                            Desafio Concluído! Bom trabalho!
+                    
+                    {challenge.steps && challenge.steps.length > 0 ? (
+                        // --- VISÃO PARA DESAFIO DE MÚLTIPLOS PASSOS ---
+                        <div>
+                            <p className="text-gray-300 mt-2 mb-6">{challenge.reason}</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                                {challenge.steps.map((step, index) => (
+                                    <StepCard 
+                                        key={step.tmdbId} 
+                                        step={step} 
+                                        onToggleStep={() => handleToggleStep(index)} 
+                                    />
+                                ))}
+                            </div>
                         </div>
                     ) : (
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <button onClick={handleAddToWatchlist} disabled={isInWatchlist(challenge.tmdbId)} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed">
-                                {isInWatchlist(challenge.tmdbId) ? "Já está na Lista" : "Adicionar à Lista"}
-                            </button>
-                            <button onClick={handleMarkAsWatched} className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg transition-colors">
-                                Já Assisti
-                            </button>
+                        // --- VISÃO PARA DESAFIO DE PASSO ÚNICO ---
+                        <div className="flex flex-col items-center">
+                            <img 
+                                src={challenge.posterUrl || 'https://placehold.co/400x600/374151/9ca3af?text=?'} 
+                                alt={`Pôster de ${challenge.title}`}
+                                className="w-48 h-72 object-cover rounded-lg shadow-lg mx-auto mb-4"
+                            />
+                            <h2 className="text-3xl font-bold text-white">{challenge.title}</h2>
+                            <p className="text-gray-300 mt-2 mb-6">{challenge.reason}</p>
+                            {/* Aqui poderiam entrar os botões de "Adicionar à Watchlist" etc. para o desafio de passo único */}
+                        </div>
+                    )}
+
+                    {challenge.status === 'completed' && (
+                        <div className="mt-6 bg-green-500/20 text-green-300 font-bold py-3 px-4 rounded-lg border border-green-500">
+                            Desafio Concluído! Bom trabalho!
                         </div>
                     )}
                 </div>

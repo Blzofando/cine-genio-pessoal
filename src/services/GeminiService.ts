@@ -1,7 +1,7 @@
 // src/services/GeminiService.ts
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { AllManagedWatchedData, ManagedWatchedItem, Recommendation, DuelResult, RadarRelease } from '../types';
+import { AllManagedWatchedData, ManagedWatchedItem, Recommendation, DuelResult, RadarRelease, Challenge } from '../types'; // Adicionado Challenge
 
 // --- Helper para Formatar Dados ---
 export const formatWatchedDataForPrompt = (data: AllManagedWatchedData): string => {
@@ -104,7 +104,30 @@ const probabilitySchema = {
     },
     required: ["loveProbability"]
 };
-
+const challengeSchema = {
+    type: Type.OBJECT,
+    properties: {
+        challengeType: { type: Type.STRING, description: "Um nome criativo e temático para o desafio (ex: 'Maratona do Mestre do Suspense', 'Semana de Animações Clássicas', 'Viagem aos Anos 80')." },
+        reason: { type: Type.STRING, description: "Uma justificativa curta e convincente, explicando por que este desafio é perfeito para o usuário, conectando com algo que ele já gosta." },
+        // O desafio pode ter UM título principal OU uma lista de passos
+        tmdbId: { type: Type.INTEGER, description: "O ID numérico do TMDb do título, CASO seja um desafio de um só filme." },
+        tmdbMediaType: { type: Type.STRING, enum: ['movie', 'tv'], description: "O tipo de mídia, CASO seja um desafio de um só filme." },
+        title: { type: Type.STRING, description: "O título oficial do filme/série, CASO seja um desafio de um só filme." },
+        steps: {
+            type: Type.ARRAY,
+            description: "Uma lista de títulos, CASO seja um desafio de múltiplos passos (ex: uma trilogia).",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING },
+                    tmdbId: { type: Type.INTEGER },
+                },
+                required: ["title", "tmdbId"]
+            }
+        }
+    },
+    required: ["challengeType", "reason"]
+};
 
 // --- Funções de Chamada à IA ---
 export const fetchRecommendation = async (prompt: string): Promise<Omit<Recommendation, 'posterUrl'>> => {
@@ -164,4 +187,32 @@ export const fetchLoveProbability = async (prompt: string): Promise<number> => {
     });
     const result = JSON.parse(response.text.trim()) as { loveProbability: number };
     return result.loveProbability;
+};
+// ### NOVA FUNÇÃO PARA GERAR O DESAFIO ###
+export const fetchWeeklyChallenge = async (prompt: string): Promise<Omit<Challenge, 'id' | 'posterUrl' | 'status'>> => {
+    if (!import.meta.env.VITE_GEMINI_API_KEY) {
+        // Mock para desenvolvimento com um desafio de múltiplos passos
+        return { 
+            challengeType: "Maratona Clássicos do Terror", 
+            reason: "Você adora suspense, mas que tal explorar as raízes do terror com estes clássicos?",
+            // Campos adicionados para satisfazer Omit<Challenge, 'id' | 'posterUrl' | 'status'>
+            title: "",
+            tmdbMediaType: "movie",
+            tmdbId: 0,
+            steps: [
+                { title: "O Exorcista (1973)", tmdbId: 9552, completed: false },
+                { title: "O Iluminado (1980)", tmdbId: 694, completed: false },
+                { title: "Psicose (1960)", tmdbId: 539, completed: false },
+            ]
+        };
+    }
+
+    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY as string });
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: { responseMimeType: "application/json", responseSchema: challengeSchema }
+    });
+
+    return JSON.parse(response.text.trim());
 };

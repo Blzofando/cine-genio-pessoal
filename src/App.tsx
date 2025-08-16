@@ -1,6 +1,6 @@
 import React, { useState, createContext, useEffect, useCallback } from 'react';
 import { WatchlistProvider } from './contexts/WatchlistContext';
-import { View, AllManagedWatchedData, Rating, ManagedWatchedItem, SuggestionFilters } from './types'; // Importando SuggestionFilters
+import { View, AllManagedWatchedData, Rating, ManagedWatchedItem, SuggestionFilters } from './types';
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from './services/firebaseConfig';
 import { getFullMediaDetailsFromQuery } from './services/RecommendationService';
