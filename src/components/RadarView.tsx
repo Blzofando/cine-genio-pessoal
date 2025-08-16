@@ -77,18 +77,16 @@ const RadarView: React.FC = () => {
     const { data: watchedData } = useContext(WatchedDataContext);
     const { addToWatchlist, isInWatchlist } = useContext(WatchlistContext);
     
-    // Estado para os dados persistidos do Firebase (lentos)
     const [relevantReleases, setRelevantReleases] = useState<RadarItem[]>([]);
     const [isLoadingRelevants, setIsLoadingRelevants] = useState(true);
 
-    // Estado para os dados rápidos da API do TMDb
     const [quickLists, setQuickLists] = useState<Record<string, RadarItem[]>>({});
     const [isLoadingQuickLists, setIsLoadingQuickLists] = useState(true);
 
     const [error, setError] = useState<string | null>(null);
     const [selectedItem, setSelectedItem] = useState<RadarItem | null>(null);
 
-    // EFEITO 1: Busca as listas rápidas da API do TMDb (executa apenas uma vez)
+    // EFEITO 1: Busca as listas rápidas da API do TMDb
     useEffect(() => {
         const fetchQuickLists = async () => {
             setIsLoadingQuickLists(true);
@@ -129,7 +127,7 @@ const RadarView: React.FC = () => {
         };
 
         fetchQuickLists();
-    }, []); // Array de dependências vazio significa que só executa uma vez
+    }, []); // Executa apenas uma vez, ao montar o componente
 
     // EFEITO 2: Ouve o Firebase e dispara a atualização em segundo plano
     useEffect(() => {
